@@ -1,0 +1,161 @@
+LCS = 177546
+TKS = 177560
+TKB = 177562
+TPS = 177564
+TPB = 177566
+Ascii0 = 60
+Dot = 56
+Enter1 = 13.
+Enter2 = 10.
+
+.=torg + 60
+.word input
+.word 200
+.word output
+.word 200
+.= torg + 100
+.word clock
+.word 300
+
+.=torg + 1000
+main: 			mov #main, sp
+				tst -(sp)
+
+				clr r1
+				clr r2
+				mov #100, @#LCS
+				mov #101, @#TKS
+				
+				wait
+				br .-2
+				
+				halt
+
+input:			
+				
+					
+output:			
+
+				rti
+
+											
+				
+time:			mov r0, -(sp)							; | r0 | PSW | pc |
+				mov r1, -(sp)							; | r1 | r0 | PSW | pc |
+				mov r2, -(sp)							; | r2 | r1 | r0 | PSW | pc |
+				mov #1, r2								; used to count digits of time passed, set to 1 to prevent endless sob loop
+				mov #STtime1, -(sp)						; | string | r2 | r1 | r0 | PSW | pc |
+				mov #14, -(sp)							; | string_len | string | r2 | r1 | r0 | PSW | pc |
+				jsr pc, print							
+				tst (sp)+								; | string | r2 | r1 | r0 | PSW | pc |		
+				cmp #1,  timeUp
+				beq .+210
+				
+					mov currPTime, r1
+					sub clockCounter, r1
+					clr r0
+					div rate, r0
+					mov r1, (sp)							; | remainder of rate | r2 | r1 | r0 | PSW | pc |
+															; - >
+					cmp r0, #10.							;see if time is less than 10 seconds, otherwise seperate it to it's different 10's components
+					blo .+24								; - >
+						inc r2								;counts the digits so unpacking them from stack would be easier
+						mov r0, r1
+						clr r0
+						div #10., r0
+						add #Ascii0, r1
+						mov r1,-(sp)						; | | | | | | | <- Digits of time in ascii | remainder | r2 | r1 | r0 | PSW | pc |
+						br .-26								;continue with seperating the number to its digits
+															; < -
+					add #Ascii0, r0
+					mov r0, -(sp)							; | first digit of time | | | | | remainder | r2 | r1 | r0 | PSW | pc |
+
+															; < -
+					jsr	pc, printChr						; - >
+					tst (sp)+
+					sob r2, .-6								; < -
+					
+					mov #Dot, -(sp)							; | "." | remainder | r2 | r1 | r0 | PSW | pc |
+					jsr pc, printChr
+					tst (sp)+								; | remainder | r2 | r1 | r0 | PSW | pc |
+					mov (sp), r1
+					mul #10., r1
+					clr r0
+					div rate, r0
+					add #Ascii0, r0
+					mov r0, (sp)							; | the tenth of time | r2 | r1 | r0 | PSW | pc |
+					jsr pc, printChr
+					
+					mov #STtime2, (sp)						; | string | r2 | r1 | r0 | PSW | pc |
+					mov #10, -(sp)							; | string_len | string | r2 | r1 | r0 | PSW | pc |
+					jsr pc, print
+					mov #Enter1, (sp)
+					jsr pc, printChr
+					mov #Enter2, (sp)
+					jsr pc, printChr
+					wait
+					tst (sp)+								; | string | r2 | r1 | r0 | PSW | pc |
+					tst (sp)+								; | r2 | r1 | r0 | PSW | pc |
+					mov (sp)+, r2							; | r1 | r0 | PSW | pc |
+					mov (sp)+, r1							; | r0 | PSW | pc |
+					mov (sp)+, r0							; | PSW | pc |
+					bis #1, @#TKS
+					
+					rti				
+
+					
+				mov #STtime3, (sp)
+				mov #3, -(sp)
+				jsr pc, print
+				tst (sp)+
+				br .-76
+				
+				
+print:	;Receives in stack (top to bottom):			
+										;text_length | <text> | ...
+										;pc | text_length | <text> | ...
+			mov r0, -(sp)				;r0 | pc | text_length | <text> | ...
+			mov 6(sp), r0				;r0 now holds the adress to the text
+			mov r1, -(sp)				;r1 | r0 | pc | text_length | <text> | ...
+			mov 6(sp), r1				;r1 now holds text's length
+		;wait until printer is free:
+	p1:		tstb @#TPS								
+			bpl p1
+		;then:
+			movb (r0)+, @#TPB
+			sob r1, p1
+			mov (sp)+, r1				;r0 | pc | text_length | <text> | ...
+			mov (sp)+, r0				; pc | text_length | <text> | ...
+			rts pc
+
+
+printChr:;Receives in stack (top to bottom):			
+										; char | ....
+										;pc | char | ...
+		;wait until printer is free:
+			tstb @#TPS								
+			bpl .-4
+		;then:
+			movb 2(sp), @#TPB
+			rts pc			
+			
+				
+clock:			inc clockCounter
+				cmp currPTime, clockCounter
+				ble .+4
+					rti
+				mov #1, timeUp
+				rti
+				
+
+rate:			.word 1000
+clockCounter:	.word 0
+.even
+
+currPTime:		.word 5000
+.even
+timeUp:			.word 0
+
+STtime1:		.ascii <Time left: >
+STtime2:		.ascii < seconds>
+STtime3:		.ascii <0.0>
