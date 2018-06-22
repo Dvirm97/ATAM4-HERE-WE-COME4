@@ -31,7 +31,7 @@ main: 			mov #main, sp
 				
 				halt
 
-input:			
+input:			rti
 				
 					
 output:			
@@ -40,14 +40,14 @@ output:
 
 											
 				
-time:			mov r0, -(sp)							; | r0 | PSW | pc |
-				mov r1, -(sp)							; | r1 | r0 | PSW | pc |
-				mov r2, -(sp)							; | r2 | r1 | r0 | PSW | pc |
+time:			mov r0, -(sp)							; | r0 | pc |
+				mov r1, -(sp)							; | r1 | r0 | pc |
+				mov r2, -(sp)							; | r2 | r1 | r0 | pc |
 				mov #1, r2								; used to count digits of time passed, set to 1 to prevent endless sob loop
-				mov #STtime1, -(sp)						; | string | r2 | r1 | r0 | PSW | pc |
-				mov #14, -(sp)							; | string_len | string | r2 | r1 | r0 | PSW | pc |
+				mov #STtime1, -(sp)						; | string | r2 | r1 | r0 | pc |
+				mov #14, -(sp)							; | string_len | string | r2 | r1 | r0 | pc |
 				jsr pc, print							
-				tst (sp)+								; | string | r2 | r1 | r0 | PSW | pc |		
+				tst (sp)+								; | string | r2 | r1 | r0 | pc |		
 				cmp #1,  timeUp
 				beq .+210
 				
@@ -55,7 +55,7 @@ time:			mov r0, -(sp)							; | r0 | PSW | pc |
 					sub clockCounter, r1
 					clr r0
 					div rate, r0
-					mov r1, (sp)							; | remainder of rate | r2 | r1 | r0 | PSW | pc |
+					mov r1, (sp)							; | remainder of rate | r2 | r1 | r0 | pc |
 															; - >
 					cmp r0, #10.							;see if time is less than 10 seconds, otherwise seperate it to it's different 10's components
 					blo .+24								; - >
@@ -64,44 +64,44 @@ time:			mov r0, -(sp)							; | r0 | PSW | pc |
 						clr r0
 						div #10., r0
 						add #Ascii0, r1
-						mov r1,-(sp)						; | | | | | | | <- Digits of time in ascii | remainder | r2 | r1 | r0 | PSW | pc |
+						mov r1,-(sp)						; | | | | | | | <- Digits of time in ascii | remainder | r2 | r1 | r0 | pc |
 						br .-26								;continue with seperating the number to its digits
 															; < -
 					add #Ascii0, r0
-					mov r0, -(sp)							; | first digit of time | | | | | remainder | r2 | r1 | r0 | PSW | pc |
+					mov r0, -(sp)							; | first digit of time | | | | | remainder | r2 | r1 | r0 | pc |
 
 															; < -
 					jsr	pc, printChr						; - >
 					tst (sp)+
 					sob r2, .-6								; < -
 					
-					mov #Dot, -(sp)							; | "." | remainder | r2 | r1 | r0 | PSW | pc |
+					mov #Dot, -(sp)							; | "." | remainder | r2 | r1 | r0 | pc |
 					jsr pc, printChr
-					tst (sp)+								; | remainder | r2 | r1 | r0 | PSW | pc |
+					tst (sp)+								; | remainder | r2 | r1 | r0 | pc |
 					mov (sp), r1
 					mul #10., r1
 					clr r0
 					div rate, r0
 					add #Ascii0, r0
-					mov r0, (sp)							; | the tenth of time | r2 | r1 | r0 | PSW | pc |
+					mov r0, (sp)							; | the tenth of time | r2 | r1 | r0 | pc |
 					jsr pc, printChr
 					
-					mov #STtime2, (sp)						; | string | r2 | r1 | r0 | PSW | pc |
-					mov #10, -(sp)							; | string_len | string | r2 | r1 | r0 | PSW | pc |
+					mov #STtime2, (sp)						; | string | r2 | r1 | r0 | pc |
+					mov #10, -(sp)							; | string_len | string | r2 | r1 | r0 | pc |
 					jsr pc, print
 					mov #Enter1, (sp)
 					jsr pc, printChr
 					mov #Enter2, (sp)
 					jsr pc, printChr
 					wait
-					tst (sp)+								; | string | r2 | r1 | r0 | PSW | pc |
-					tst (sp)+								; | r2 | r1 | r0 | PSW | pc |
-					mov (sp)+, r2							; | r1 | r0 | PSW | pc |
-					mov (sp)+, r1							; | r0 | PSW | pc |
-					mov (sp)+, r0							; | PSW | pc |
+					tst (sp)+								; | string | r2 | r1 | r0 | pc |
+					tst (sp)+								; | r2 | r1 | r0 | pc |
+					mov (sp)+, r2							; | r1 | r0 | pc |
+					mov (sp)+, r1							; | r0 | pc |
+					mov (sp)+, r0							; | pc |
 					bis #1, @#TKS
 					
-					rti				
+					rts				
 
 					
 				mov #STtime3, (sp)
