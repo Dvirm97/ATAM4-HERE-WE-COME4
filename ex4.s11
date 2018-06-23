@@ -15,11 +15,11 @@ TKS = 177560
 TKB = 177562
 TPS = 177564
 TPB = 177566
-
+;h - 150; c - 143
 
 
 . = torg + 3000
-main:
+main:		
 			mov pc, sp	;init stack
 			tst -(sp) 	;init stack
 			mov #receive, @#60
@@ -32,64 +32,67 @@ main:
 			
 		;print opening message:	
 			mov #openMsg, -(sp)
-			mov #61, -(sp)
 			jsr pc, print
-			add #4, sp
+			tst (sp)+
 		;print new row:	
 			mov #newRow, -(sp)
-			mov #3, -(sp)
 			jsr pc, print
-			add #4, sp
-		
+			mov #44, (sp)				;'$'
+			jsr pc, printChr
+			tst (sp)+
+			
 			mov #input, r0
 			mov #input, r1
-			add #100, r1
-			mov #101, @#TKS				;->
+			add #124, r1				;adress of end of input
+			mov #101, @#TKS				
+			bis #1, @#TKS				;->
 			wait
 			br .-10 					;<-
-			halt		
-openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!>
+			halt
+openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!\0>
 .even 
-newRow: .ascii<\r\n$>
+newRow: .ascii<\r\n\0>
 .even
-startMsg: .ascii<~starting shit~>
+startMsg: .ascii<Starting a new game\0>
 .even			
+cntExe1: .ascii<Cannot execute "\0>
+.even
+cntExe2: .ascii<".\0>
+.even
+input: .blkw 31
+	   .byte 0  		;up to 50(decimal) chars	
+.even
+
+roleW: .blkw 1
 timeW: .blkw 1
-.even
-timeB: .blkw 1	
-.even
-input: .blkw 62					;up to 50(decimal) chars
-.even
-cntExe1: .ascii<Cannot execute ">
-.even
-ErrCmd: .blkw 62	
-.even
-cntExe2: .ascii<".>
-.even	
-
-
+roleB: .blkw 1
+timeB: .blkw 1
+gameStat: .blkw 1
 
 
 
 receive: 	;receives input~
-			;assumes r0 points to current pos in input, and r1 to input's end			
-			clr @#TKS
-			movb #1, @#TKS
+			;assumes r0 points to current pos in input, and r1 to input's end
+			
 			tstb @#TKS
-			bpl .-2
+			bpl .-4
 			clr -(sp)					; 0 |
 			movb @#TKB, (sp)			;char |
-			cmp (sp), #15				;Enter?
+			
+			cmp (sp), #15				;is enter?
 			bne r_check2
-				mov #newRow, (sp)
-				mov #3, -(sp)
+				mov #newRow, (sp)		;<newRow>
 				jsr pc, print
+				jsr pc, exe_cmd1
 				jsr pc, clrInput
+				mov #newRow, (sp)		;<newRow>
+				jsr pc, print
+				mov #44, (sp)			;'$'
+				jsr pc, printChr
 				mov #input, r0
-				tst (sp)+
 				br r_end
-		r_check2:
-			cmp (sp), #10				;BackSpace?
+	r_check2:
+			cmp (sp), #10				;is BackSpace?
 			bne r_next					;->	
 				cmp r0, #input
 				ble r_end
@@ -98,36 +101,38 @@ receive: 	;receives input~
 				jsr pc, printChr				
 				mov #10, (sp)			;BS |
 				jsr pc, printChr
-				clr (r0)
-				tst -(r0)
+				tstb -(r0)
+				clrb (r0)
 				br r_end
 	r_next:	cmp r0, r1
 			bge r_end
-			mov @#TKB, (r0)+			;<-
+			movb @#TKB, (r0)+			;<-
 			jsr pc, printChr
 	r_end:	tst (sp)+					;~empty~
 			rti
 
 print:	;Receives in stack (top to bottom):			
-										;text_length | <text> | ...
-										;pc | text_length | <text> | ...
-			mov r0, -(sp)				;r0 | pc | text_length | <text> | ...
-			mov 6(sp), r0				;r0 now holds the adress to the text
-			mov r1, -(sp)				;r1 | r0 | pc | text_length | <text> | ...
-			mov 6(sp), r1				;r1 now holds text's length
+										;<text> | ...
+										;pc | <text> | ...
+			mov r0, -(sp)				;r0 | pc | <text> | ...
+			mov 4(sp), r0				;r0 now holds the adress to the text
 		;wait until printer is free:
-	p1:		tstb @#TPS								
-			bpl p1
+	p_next1:		
+			cmpb (r0), #0
+			beq p_next2
+		;wait for printer:
+			tstb @#TPS								
+			bpl .-4
 		;then:
 			movb (r0)+, @#TPB
-			sob r1, p1
-			mov (sp)+, r1				;r0 | pc | text_length | <text> | ...
-			mov (sp)+, r0				; pc | text_length | <text> | ...
+			br p_next1
+	p_next2:		
+			mov (sp)+, r0				; pc | <text> | ...
 			rts pc
 
 
 printChr:;Receives in stack (top to bottom):			
-										; char | ....
+										; char | ...
 										;pc | char | ...
 		;wait until printer is free:
 			tstb @#TPS								
@@ -136,12 +141,12 @@ printChr:;Receives in stack (top to bottom):
 			movb 2(sp), @#TPB
 			rts pc
 
-clrInput:
+clrInput:	;sets
 			mov r0, -(sp)
 			mov #input, r0
 			mov r1, -(sp)
-			mov #62, r1
-			clr (r0)+ 					;maybe put space instead?
+			mov #31, r1
+			clrb (r0)+ 					;maybe put space instead?
 			sob r1, .-2
 			mov (sp)+, r1
 			mov (sp)+, r0
@@ -150,70 +155,162 @@ clrInput:
 exe_cmd1:
 			mov r0, -(sp)				;r0 | ...
 			mov #input, r0
-			tst -(r0)					
+			mov r1, -(sp)				;r1 | r0 | ...
+			clr r1
 			
-			tst (r0)+					;<-
-			cmp (r0), #40 				;' '
+			tstb -(r0)					
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
 			beq .-6						;-> 
 			
-			cmp (r0)+, #163				;'s'
+			cmpb (r0)+, #163			;'s'
 			bne exe1End
-			cmp (r0)+, #164				;'t'
+			cmpb (r0)+, #164			;'t'
 			bne exe1End
-			cmp (r0)+, #141				;'a'
+			cmpb (r0)+, #141			;'a'
 			bne exe1End
-			cmp (r0)+, #162				;'r'
+			cmpb (r0)+, #162			;'r'
 			bne exe1End
-			cmp (r0)+, #164				;'t'
+			cmpb (r0)+, #164			;'t'
 			bne exe1End
-			cmp (r0)+, #40				;' '
+			cmpb (r0), #40				;' '
 			bne exe1End
+						
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;-> 
+			
+			cmpb (r0), #143				;'c'
+			bne exe1nxt1
+				mov #0, roleW
+				br exe1nxt2				
+		exe1nxt1:	
+			cmpb (r0), #150				;'h'
+			bne exe1End
+				mov #1, roleW
+				;br exe1nxt2
+				
+		exe1nxt2:
+			tstb (r0)+
+			cmpb (r0), #40				;' '
+			bne exe1End
+		
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;->
+			
+			tst -(sp)					; - | r1 | r0 | pc | ...
+			clr (sp)					;0 | r1 | r0 | pc | ...
+		exe1num1:	
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | ...
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | ...
+			cmp (sp), #-1
+			bne exe1nxt3
+				tst (sp)+					;r1 | r0 | pc | ...
+				br exe1End			
+		exe1nxt3:
+			mul #12, r1
+			add (sp), r1
+			
+			cmpb (r0), #40				;' '
+			bne exe1num1
+			mov r1, timeW
+			tst (sp)+					;r1 | r0 | pc | ...
+			
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;-> 
+			
+			cmpb (r0), #143				;'c'
+			bne exe1nxt4
+				mov #0, roleB
+				br exe1nxt5				
+		exe1nxt4:	
+			cmpb (r0), #150				;'h'
+			bne exe1End
+				mov #1, roleB
+				;br exe1nxt5
+				
+		exe1nxt5:
+			tstb (r0)+
+			cmpb (r0), #40				;' '
+			bne exe1End
+		
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;->
+			
+			clr r1
+			tst -(sp)					; - | r1 | r0 | pc | ...
+			clr (sp)					;0 | r1 | r0 | pc | ...
+		exe1num2:	
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | ... 
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | ...
+			cmp (sp), #-1
+			bne exe1nxt6
+				tst (sp)+					;r1 | r0 | pc | ...
+				br exe1End			
+		exe1nxt6:
+			mul #12, r1
+			add (sp), r1
+			
+			cmpb (r0), #0				;'\0'
+			beq exe1exe
+			cmpb (r0), #40				;' '
+			beq exe1exe
+			br exe1num2
+					
+		exe1exe:
+			mov r1, timeB
+			tst (sp)+						;r1 | r0 | pc | ...
 			jsr pc, exeStart
+			mov (sp)+, r1
 			mov (sp)+, r0
 			rts pc
 			
 		exe1End:
-			mov #cntExe1, -(sp)
-			mov #102, -(sp)
+			mov #cntExe1, -(sp)				;<cantExecute1> | r1 | r0 | pc | ...
 			jsr pc, print
-			add #4, sp 
-			
-			mov (sp)+, r0
+			mov #input, (sp)				;<input> | r1 | r0 | pc | ...
+			jsr pc, print
+			mov #cntExe2, (sp)				;<cantExecute2> | r1 | r0 | pc | ...
+			jsr pc, print
+			tst (sp)+ 						;r1 | r0 | pc | ...
+			mov (sp)+, r1
+			mov (sp)+, r0					;pc | ...
 			rts pc
-			
+
 			
 exeStart:
-			mov #cntExe1, -(sp)
-			mov #102, -(sp)
+			mov #1, gameStat
+			mov #startMsg, -(sp)
+			jsr pc, print
+			tst (sp)+
 			rts pc
 			
-			
-			
-			
-			
-			;mov #SrcPos, -(sp)
-			;mov #DstPos, -(sp)
-			;mov #WinParam, -(sp)
-			
-			
-			
-			jsr pc, getMaxWP
-			tst (sp)+
-			tst (sp)+
-			tst (sp)+
-			asr SrcPos
-			asr DstPos	
-			mov WinParam, r0
-			mov SrcPos, r1
-			mov DstPos, r2
-			halt
+trnToNum:	;gets in stack a number that represents an ascii code
+			;*overwrites it* and returns the (oct)number it represents
+			;if it's not a digit at all, returns -1
+										;pc | digit
+			cmp 2(sp), #60
+			blt ttnBad
+			cmp 2(sp), #71
+			bgt ttnBad
+			sub #60, 2(sp)				;pc | actualNum
+			rts pc	
+		ttnBad:
+			mov #-1, 2(sp)				;pc | -1
+			rts pc
 
 
 			
 
 			
 
+;~~~~~from here on it's ATAM3:~~~~~
 
+
+			
 	;checks if player has any playpieces on board, if not that is not a winning situation
 
 checkWin:	
