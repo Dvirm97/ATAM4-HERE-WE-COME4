@@ -307,7 +307,8 @@ trnToNum:	;gets in stack a number that represents an ascii code
 		ttnBad:
 			mov #-1, 2(sp)				;pc | -1
 			rts pc
-
+			
+;reads the input and calls the appropriate command, if game status permits
 readCmd:	
 			tst -(sp)						; - | pc
 			cmp gameStat, #1
@@ -324,6 +325,17 @@ readCmd:
 			jsr pc, timeChk
 			cmp (sp), #1
 			beq rcmdX
+			cmp Player #1
+			bgt	rcmd2
+				cmp roleW, #1
+				beq rcmd3
+					br rcmdErr
+		rcmd2:
+				cmp roleB, #1
+				beq rcmd3
+					br rcmdErr
+			
+		rcmd3:
 			jsr pc, moveChk
 			cmp (sp), #1
 			beq rcmdX
@@ -460,9 +472,7 @@ moveChk:
 		tstb (r0)+					;<-
 		cmpb (r0), #40 				;' '
 		beq .-6						;->
-		
-		
-		
+				
 		clr -(sp)					; - | r0
 		movb (r0)+, (sp)			;char | r0
 		jsr pc, trnToNum			;*num* | r0
@@ -471,10 +481,10 @@ moveChk:
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
 		bge mChkX
-		asl r1						;multiply by 8, and then by 2:
+		asl r1						;multiply by 8, and then by 2 (because each word is 2 bytes):
 		asl r1
 		asl r1
-		asl r1						;again? ask uriya
+		asl r1						
 		add r1, tempDst
 		
 		clr -(sp)					; - | r0
@@ -485,7 +495,7 @@ moveChk:
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
 		bge mChkX
-		asl r1						;ask uriya
+		asl r1						;multiply by 2 (because each word is 2 bytes):
 		add r1, tempDst
 				
 		cmpb (r0), #0				;'\0'
@@ -864,7 +874,7 @@ getMaxWP:	;Returns the best move to do and its WP
 					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* | #Board |
 					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* |
 					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 |
-					return
+					br return
 			lfpNext:
 				cmp (r0), Player
 				bne loopFindPlayer
