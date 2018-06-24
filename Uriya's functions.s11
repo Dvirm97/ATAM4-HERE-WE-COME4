@@ -45,7 +45,21 @@ main: 			mov #main, sp
 				
 				halt
 
-input:			mov r2, -(sp)							; | r2 | pc | - |
+input:			rti
+
+				
+
+					
+				
+				
+				
+					
+output:			
+
+				rti
+
+				
+exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov r4, -(sp)							; | r4 | r2 | pc | - |
 				mov r5, -(sp)							; | r5 | r4 | r2 | pc | - |
 				mov clockCounter, 10(sp)				; | r5 | r4 | r2 | pc | time |
@@ -102,8 +116,8 @@ input:			mov r2, -(sp)							; | r2 | pc | - |
 				cmp Player, #Black
 				beq BChkLegal
 
-;}else
-;WChkLegal:		
+	;}else
+	;WChkLegal:		
 				tst r2
 				bmi illegal
 				
@@ -126,10 +140,10 @@ input:			mov r2, -(sp)							; | r2 | pc | - |
 						beq finish
 							br illegal
 					
-ilegal:			br illegal
+	ilegal:		br illegal
 
 					
-WChkLeap:		cmp r5, #NEdgeL
+	WChkLeap:	cmp r5, #NEdgeL
 				bgt .+12
 					cmp r2, #LeapC
 					bne illegal
@@ -147,7 +161,7 @@ WChkLeap:		cmp r5, #NEdgeL
 					beq finishL
 						br illegal
 						
-BChkLegal:		tst r2
+	BChkLegal:	tst r2
 				bpl illegal
 				
 				neg r2
@@ -172,14 +186,14 @@ BChkLegal:		tst r2
 						
 
 
-finishL:		mov dstPos, r5
+	finishL:	mov dstPos, r5
 				add srcPos, r5
 				asr r5
 				add #Board, r5
 				mov #Empty, (r5)
 				br finish
 				
-illegal:		
+	illegal:		
 				mov Player, r2
 				neg r2
 				add #3, r2
@@ -193,7 +207,7 @@ illegal:
 				
 						
 						
-finish:			mov #Board, -(sp)						; | #Board | r5 | r4 | r2 | pc | time |
+	finish:		mov #Board, -(sp)						; | #Board | r5 | r4 | r2 | pc | time |
 				mov srcPos, .+20
 				mov dstPos, .+14
 				jsr r5, movPiece
@@ -226,7 +240,7 @@ finish:			mov #Board, -(sp)						; | #Board | r5 | r4 | r2 | pc | time |
 				rti
 
 							
-BChkLeap:		cmp r5, #NEdgeL
+	BChkLeap:	cmp r5, #NEdgeL
 				bgt .+12
 					cmp r2, #LeapF
 					bne illegal
@@ -244,18 +258,6 @@ BChkLeap:		cmp r5, #NEdgeL
 					beq finishL
 						br illegal
 						
-
-				
-
-					
-				
-				
-				
-					
-output:			
-
-				rti
-
 
 printTime:		mov r0, -(sp)							; | r0 | pc |
 				mov r2, -(sp)							; | r2 | r0 | pc |
@@ -299,7 +301,7 @@ printTime:		mov r0, -(sp)							; | r0 | pc |
 				
 					
 				
-time:			mov r1, -(sp)							; | r1 | pc |
+exeTime:		mov r1, -(sp)							; | r1 | pc |
 				mov #STtime1, -(sp)						; | string | r1 | pc |
 				jsr pc, print								
 				cmp #1,  timeUp
@@ -310,7 +312,7 @@ time:			mov r1, -(sp)							; | r1 | pc |
 					jsr pc, printTime
 					
 					
-string2:			mov #STtime2, (sp)						; | string | r1 | pc |
+	string2:		mov #STtime2, (sp)						; | string | r1 | pc |
 					jsr pc, print
 					mov #Enter1, (sp)
 					jsr pc, printChr
@@ -323,7 +325,7 @@ string2:			mov #STtime2, (sp)						; | string | r1 | pc |
 					rts	pc		
 
 					
-noTime:			mov #STtime3, (sp)
+	noTime:		mov #STtime3, (sp)
 				mov #3, -(sp)
 				jsr pc, print
 				tst (sp)+
@@ -331,7 +333,7 @@ noTime:			mov #STtime3, (sp)
 				
 				
 				
-stop:			mov r0, -(sp)							; | r0 | pc |... 
+exeStop:		mov r0, -(sp)							; | r0 | pc |... 
 				mov r1, -(sp)							; | r1 | r0 | pc |...
 				mov r4, -(sp)							; | r4 | r1 | r0 | pc |...
 				mov #Enter1, -(sp)						; | char | r4 | r1 | r0 | pc |
@@ -419,7 +421,7 @@ stop:			mov r0, -(sp)							; | r0 | pc |...
 				
 				rts pc
 				
-printTie:		mov #STtie, (sp)
+	printTie:	mov #STtie, (sp)
 				jsr pc, print
 				
 				tst (sp)+								; | r4 | r1 | r0 | pc |
