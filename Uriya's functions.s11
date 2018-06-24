@@ -203,7 +203,7 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov (sp)+, r4							; | r2 | pc | 0 |	
 				mov (sp)+, r2							; | pc | 0 |
 
-				rti
+				rts pc
 				
 						
 						
@@ -237,7 +237,7 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov (sp)+, r4							; | r2 | pc | 1 |	
 				mov (sp)+, r2							; | pc | 1 |
 
-				rti
+				rts pc
 
 							
 	BChkLeap:	cmp r5, #NEdgeL
