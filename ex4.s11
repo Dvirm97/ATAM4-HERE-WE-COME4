@@ -325,7 +325,7 @@ readCmd:
 			jsr pc, timeChk
 			cmp (sp), #1
 			beq rcmdX
-			cmp Player #1
+			cmp Player, #1
 			bgt	rcmd2
 				cmp roleW, #1
 				beq rcmd3
@@ -422,10 +422,10 @@ timeMsg: .ascii<TIME!>
 .even
 			
 moveChk: 
-		mov #0, 2(sp)
-		mov r0, -(sp)
+		mov #0, 2(sp)				;pc | 0
+		mov r0, -(sp)				;r0 | pc | 0
 		mov #input, r0
-		mov r1, -(sp)
+		mov r1, -(sp)				;r1 | r0 | pc | 0 |...
 		
 		cmpb (r0)+, #155			;'m'
 		bne mChkX
@@ -442,10 +442,10 @@ moveChk:
 		cmpb (r0), #40 				;' '
 		beq .-6						;->
 		
-		clr -(sp)					; - | r0
-		movb (r0)+, (sp)			;char | r0
-		jsr pc, trnToNum			;*num* | r0
-		mov (sp)+, r1				;r0
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
 		cmp r1, #-1
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
@@ -456,10 +456,10 @@ moveChk:
 		asl r1						;again? ask uriya
 		add r1, tempSrc
 		
-		clr -(sp)					; - | r0
-		movb (r0)+, (sp)			;char | r0
-		jsr pc, trnToNum			;*num* | r0
-		mov (sp)+, r1				;r0
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
 		cmp r1, #-1
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
@@ -487,10 +487,10 @@ moveChk:
 		asl r1						
 		add r1, tempDst
 		
-		clr -(sp)					; - | r0
-		movb (r0)+, (sp)			;char | r0
-		jsr pc, trnToNum			;*num* | r0
-		mov (sp)+, r1				;r0
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
 		cmp r1, #-1
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
@@ -505,15 +505,20 @@ moveChk:
 	mChkX:
 		clr tempSrc
 		clr tempDst
-		mov (sp)+, r1
-		mov (sp)+, r0
+		mov (sp)+, r1				;r0 | pc | -
+		mov (sp)+, r0				;pc | -
 		rts pc
 	
 	mChk1:
-		mov #1, 6(sp)
 		mov tempSrc, SrcPos
 		mov tempDst, DstPos
-		jsr pc, exeMove
+		tst -(sp)					; - | r1 | r0 | pc | 0 |...
+		jsr pc, exeMove				;0/1 | r1 | r0 | pc | 0 |...
+		cmp (sp), #1
+		bne .+10 					;->
+		mov #1, 10(sp)
+		tst (sp)+					;<-
+									;r1 | r0 | pc | 0 |...
 		br mChkX
 tempSrc: .blkw 1
 tempDst: .blkw 1
