@@ -2,9 +2,13 @@ Black = 2
 White = 1
 SkipC = 16
 SkipF = 22
+LeapC = 34
+LeapF = 44
 Empty = 0
 EdgeR = 16
 EdgeL = 0
+NEdgeR = 14
+NEdgeL = 2
 Win = 20
 Loss = 177760 ;which is actually -20
 Tie = 0
@@ -15,14 +19,22 @@ TKS = 177560
 TKB = 177562
 TPS = 177564
 TPB = 177566
+Ascii0 = 60
+Dot = 56
+Enter1 = 13.
+Enter2 = 10.
+Minus = 55
 
+
+
+. = torg + 60
+.word receive
+.word 200
 
 . = torg + 3000
 main:		
 			mov pc, sp	;init stack
 			tst -(sp) 	;init stack
-			mov #receive, @#60
-			mov #200, @#62
 			
 			;mov #100, @#LCS
 			
@@ -363,7 +375,7 @@ stopChk:
 		bne stpChkX
 		cmpb (r0)+, #157			;'o'
 		bne stpChkX
-		cmpb (r0)+, #157			;'p'
+		cmpb (r0)+, #160			;'p'
 		bne stpChkX
 		cmpb (r0), #0				;'\0'
 		beq stpChk1
@@ -376,7 +388,7 @@ stopChk:
 	stpChk1:
 		mov #1, 4(sp)
 		jsr pc, exeStop
-		stpChkX
+		br stpChkX
 		
 		
 exeStop: ;stops.
@@ -411,7 +423,7 @@ timeChk:
 	tChk1:
 		mov #1, 4(sp)
 		jsr pc, exeTime
-		tChkX
+		br tChkX
 		
 exeTime: ;tells time.
 		mov #timeMsg, -(sp)
