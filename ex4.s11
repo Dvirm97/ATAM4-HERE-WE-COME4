@@ -15,7 +15,6 @@ TKS = 177560
 TKB = 177562
 TPS = 177564
 TPB = 177566
-;h - 150; c - 143
 
 
 . = torg + 3000
@@ -38,7 +37,7 @@ main:
 			mov #newRow, -(sp)
 			jsr pc, print
 			mov #44, (sp)				;'$'
-			jsr pc, printChr
+			jsr pc, printChr			
 			tst (sp)+
 			
 			mov #input, r0
@@ -83,14 +82,15 @@ receive: 	;receives input~
 			bne r_check2
 				mov #newRow, (sp)		;<newRow>
 				jsr pc, print
-				jsr pc, exe_cmd1
+				jsr pc, readCmd
 				jsr pc, clrInput
+				mov #input, r0
 				mov #newRow, (sp)		;<newRow>
 				jsr pc, print
 				mov #44, (sp)			;'$'
 				jsr pc, printChr
-				mov #input, r0
 				br r_end
+				
 	r_check2:
 			cmp (sp), #10				;is BackSpace?
 			bne r_next					;->	
@@ -152,10 +152,13 @@ clrInput:	;sets
 			mov (sp)+, r0
 			rts pc
 			
-exe_cmd1:
-			mov r0, -(sp)				;r0 | ...
+startChk:	;receives empty place in stack, to flag whether executed or not
+			;r0 used for iterating over input
+			;r1 used for calculating time
+			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether ex'd or not
+			mov r0, -(sp)				;r0 | pc | 0 | ...
 			mov #input, r0
-			mov r1, -(sp)				;r1 | r0 | ...
+			mov r1, -(sp)				;r1 | r0 | pc | 0 | ...
 			clr r1
 			
 			tstb -(r0)					
@@ -164,93 +167,93 @@ exe_cmd1:
 			beq .-6						;-> 
 			
 			cmpb (r0)+, #163			;'s'
-			bne exe1End
+			bne .+6						; supposed to be sChkX but branch too far
 			cmpb (r0)+, #164			;'t'
-			bne exe1End
+			bne sChkX
 			cmpb (r0)+, #141			;'a'
-			bne exe1End
+			bne sChkX
 			cmpb (r0)+, #162			;'r'
-			bne exe1End
+			bne sChkX
 			cmpb (r0)+, #164			;'t'
-			bne exe1End
+			bne sChkX
 			cmpb (r0), #40				;' '
-			bne exe1End
+			bne sChkX
 						
 			tstb (r0)+					;<-
 			cmpb (r0), #40 				;' '
 			beq .-6						;-> 
 			
 			cmpb (r0), #143				;'c'
-			bne exe1nxt1
-				mov #0, roleW
-				br exe1nxt2				
-		exe1nxt1:	
+			bne sChk1
+				mov #0, RtempW
+				br sChk2				
+		sChk1:	
 			cmpb (r0), #150				;'h'
-			bne exe1End
-				mov #1, roleW
-				;br exe1nxt2
+			bne sChkX
+				mov #1, RtempW
+				;br sChk2
 				
-		exe1nxt2:
+		sChk2:
 			tstb (r0)+
 			cmpb (r0), #40				;' '
-			bne exe1End
+			bne sChkX
 		
 			tstb (r0)+					;<-
 			cmpb (r0), #40 				;' '
 			beq .-6						;->
 			
-			tst -(sp)					; - | r1 | r0 | pc | ...
-			clr (sp)					;0 | r1 | r0 | pc | ...
+			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
+			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
 		exe1num1:	
-			movb (r0)+, (sp)			;char | r1 | r0 | pc | ...
-			jsr pc, trnToNum			;*num* | r1 | r0 | pc | ...
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ...
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
 			cmp (sp), #-1
-			bne exe1nxt3
-				tst (sp)+					;r1 | r0 | pc | ...
-				br exe1End			
-		exe1nxt3:
+			bne sChk3
+				tst (sp)+					;r1 | r0 | pc | 0 | ...
+				br sChkX			
+		sChk3:
 			mul #12, r1
 			add (sp), r1
 			
 			cmpb (r0), #40				;' '
 			bne exe1num1
-			mov r1, timeW
-			tst (sp)+					;r1 | r0 | pc | ...
+			mov r1, TtempW
+			tst (sp)+					;r1 | r0 | pc | 0 | ...
 			
 			tstb (r0)+					;<-
 			cmpb (r0), #40 				;' '
 			beq .-6						;-> 
 			
 			cmpb (r0), #143				;'c'
-			bne exe1nxt4
-				mov #0, roleB
-				br exe1nxt5				
-		exe1nxt4:	
+			bne sChk4
+				mov #0, RtempB
+				br sChk5				
+		sChk4:	
 			cmpb (r0), #150				;'h'
-			bne exe1End
-				mov #1, roleB
-				;br exe1nxt5
+			bne sChkX
+				mov #1, RtempB
+				;br sChk5
 				
-		exe1nxt5:
+		sChk5:
 			tstb (r0)+
 			cmpb (r0), #40				;' '
-			bne exe1End
+			bne sChkX
 		
 			tstb (r0)+					;<-
 			cmpb (r0), #40 				;' '
 			beq .-6						;->
 			
 			clr r1
-			tst -(sp)					; - | r1 | r0 | pc | ...
-			clr (sp)					;0 | r1 | r0 | pc | ...
+			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
+			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
 		exe1num2:	
-			movb (r0)+, (sp)			;char | r1 | r0 | pc | ... 
-			jsr pc, trnToNum			;*num* | r1 | r0 | pc | ...
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ... 
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
 			cmp (sp), #-1
-			bne exe1nxt6
-				tst (sp)+					;r1 | r0 | pc | ...
-				br exe1End			
-		exe1nxt6:
+			bne sChk6
+				tst (sp)+					;r1 | r0 | pc | 0 | ...
+				br sChkX			
+		sChk6:
 			mul #12, r1
 			add (sp), r1
 			
@@ -261,24 +264,27 @@ exe_cmd1:
 			br exe1num2
 					
 		exe1exe:
-			mov r1, timeB
-			tst (sp)+						;r1 | r0 | pc | ...
+			mov r1, TtempB
+			tst (sp)+						;r1 | r0 | pc | 0 | ...
+			mov RtempW, roleW
+			mov TtempW, timeW
+			mov RtempB, roleB
+			mov TtempB, timeB
 			jsr pc, exeStart
 			mov (sp)+, r1
 			mov (sp)+, r0
+			mov #1, 2(sp)
 			rts pc
 			
-		exe1End:
-			mov #cntExe1, -(sp)				;<cantExecute1> | r1 | r0 | pc | ...
-			jsr pc, print
-			mov #input, (sp)				;<input> | r1 | r0 | pc | ...
-			jsr pc, print
-			mov #cntExe2, (sp)				;<cantExecute2> | r1 | r0 | pc | ...
-			jsr pc, print
-			tst (sp)+ 						;r1 | r0 | pc | ...
-			mov (sp)+, r1
-			mov (sp)+, r0					;pc | ...
+		sChkX:
+			mov (sp)+, r1					;r0 | pc | 0 | ...
+			mov (sp)+, r0					;pc | 0 | ...
+			;mov #0, 2(sp)
 			rts pc
+RtempW: .blkw 1
+TtempW: .blkw 1
+RtempB: .blkw 1
+TtempB: .blkw 1
 
 			
 exeStart:
@@ -302,10 +308,215 @@ trnToNum:	;gets in stack a number that represents an ascii code
 			mov #-1, 2(sp)				;pc | -1
 			rts pc
 
-
+readCmd:	
+			tst -(sp)						; - | pc
+			cmp gameStat, #1
+			beq rcmd1
+			jsr pc, startChk
+			cmp (sp), #1
+			beq rcmdX
+			br rcmdErr
 			
-
+		rcmd1:
+			jsr pc, stopChk
+			cmp (sp), #1
+			beq rcmdX
+			jsr pc, timeChk
+			cmp (sp), #1
+			beq rcmdX
+			jsr pc, moveChk
+			cmp (sp), #1
+			beq rcmdX
 			
+		rcmdErr:
+			mov #cntExe1, -(sp)				;<cantExecute1> | 0 | pc | ...
+			jsr pc, print
+			mov #input, (sp)				;<input> | 0 | pc | ...
+			jsr pc, print
+			mov #cntExe2, (sp)				;<cantExecute2> | 0 | pc | ...
+			jsr pc, print	
+			tst (sp)+
+		rcmdX:
+			tst (sp)+
+			rts pc
+			
+stopChk: 
+		mov #0, 2(sp)
+		mov r0, -(sp)
+		mov #input, r0
+		
+		cmpb (r0)+, #163			;'s'
+		bne stpChkX
+		cmpb (r0)+, #164			;'t'
+		bne stpChkX
+		cmpb (r0)+, #157			;'o'
+		bne stpChkX
+		cmpb (r0)+, #157			;'p'
+		bne stpChkX
+		cmpb (r0), #0				;'\0'
+		beq stpChk1
+		cmpb (r0), #40				;' '
+		beq stpChk1
+	stpChkX:
+		mov (sp)+, r0
+		rts pc
+	
+	stpChk1:
+		mov #1, 4(sp)
+		jsr pc, exeStop
+		stpChkX
+		
+		
+exeStop: ;stops.
+		mov #stopMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+stopMsg: .ascii<STOP!>
+.even
+		
+timeChk: 
+		mov #0, 2(sp)
+		mov r0, -(sp)
+		mov #input, r0
+		
+		cmpb (r0)+, #164			;'t'
+		bne tChkX
+		cmpb (r0)+, #151			;'i'
+		bne tChkX
+		cmpb (r0)+, #155			;'m'
+		bne tChkX
+		cmpb (r0)+, #145			;'e'
+		bne tChkX
+		cmpb (r0), #0				;'\0'
+		beq tChk1
+		cmpb (r0), #40				;' '
+		beq tChk1
+	tChkX:
+		mov (sp)+, r0
+		rts pc
+	
+	tChk1:
+		mov #1, 4(sp)
+		jsr pc, exeTime
+		tChkX
+		
+exeTime: ;tells time.
+		mov #timeMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+timeMsg: .ascii<TIME!>
+.even
+			
+moveChk: 
+		mov #0, 2(sp)
+		mov r0, -(sp)
+		mov #input, r0
+		mov r1, -(sp)
+		
+		cmpb (r0)+, #155			;'m'
+		bne mChkX
+		cmpb (r0)+, #157			;'o'
+		bne mChkX
+		cmpb (r0)+, #166			;'v'
+		bne mChkX
+		cmpb (r0)+, #145			;'e'
+		bne mChkX
+		cmpb (r0), #40				;' '
+		bne mChkX
+		;skip spaces:
+		tstb (r0)+					;<-
+		cmpb (r0), #40 				;' '
+		beq .-6						;->
+		
+		clr -(sp)					; - | r0
+		movb (r0)+, (sp)			;char | r0
+		jsr pc, trnToNum			;*num* | r0
+		mov (sp)+, r1				;r0
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;multiply by 8, and then by 2:
+		asl r1
+		asl r1
+		asl r1						;again? ask uriya
+		add r1, tempSrc
+		
+		clr -(sp)					; - | r0
+		movb (r0)+, (sp)			;char | r0
+		jsr pc, trnToNum			;*num* | r0
+		mov (sp)+, r1				;r0
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;ask uriya
+		add r1, tempSrc
+		
+		cmpb (r0), #40				;' '
+		bne mChkX
+		tstb (r0)+					;<-
+		cmpb (r0), #40 				;' '
+		beq .-6						;->
+		
+		
+		
+		clr -(sp)					; - | r0
+		movb (r0)+, (sp)			;char | r0
+		jsr pc, trnToNum			;*num* | r0
+		mov (sp)+, r1				;r0
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;multiply by 8, and then by 2:
+		asl r1
+		asl r1
+		asl r1						;again? ask uriya
+		add r1, tempDst
+		
+		clr -(sp)					; - | r0
+		movb (r0)+, (sp)			;char | r0
+		jsr pc, trnToNum			;*num* | r0
+		mov (sp)+, r1				;r0
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;ask uriya
+		add r1, tempDst
+				
+		cmpb (r0), #0				;'\0'
+		beq mChk1
+		cmpb (r0), #40				;' '
+		beq mChk1
+	mChkX:
+		clr tempSrc
+		clr tempDst
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+	
+	mChk1:
+		mov #1, 6(sp)
+		mov tempSrc, SrcPos
+		mov tempDst, DstPos
+		jsr pc, exeMove
+		br mChkX
+tempSrc: .blkw 1
+tempDst: .blkw 1
+
+
+
+exeMove: ;plays move.
+		mov #moveMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+moveMsg: .ascii<MOVE!>	
+.even		
 
 ;~~~~~from here on it's ATAM3:~~~~~
 
