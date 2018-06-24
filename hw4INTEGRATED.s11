@@ -1,0 +1,1858 @@
+Black = 2
+White = 1
+SkipC = 16
+SkipF = 22
+LeapC = 34
+LeapF = 44
+Empty = 0
+EdgeR = 16
+EdgeL = 0
+NEdgeR = 14
+NEdgeL = 2
+Win = 20
+Loss = 177760 ;which is actually -20
+Tie = 0
+Lowest = 177757; which is actually -21
+Highest = 21
+LCS = 177546
+TKS = 177560
+TKB = 177562
+TPS = 177564
+TPB = 177566
+Ascii0 = 60
+Dot = 56
+Enter1 = 13.
+Enter2 = 10.
+Minus = 55
+
+
+
+. = torg + 60
+.word receive
+.word 200
+
+. = torg + 3000
+main:		
+			mov pc, sp	;init stack
+			tst -(sp) 	;init stack
+			
+			;mov #100, @#LCS
+			
+			
+			
+			
+		;print opening message:	
+			mov #openMsg, -(sp)
+			jsr pc, print
+			tst (sp)+
+		;print new row:	
+			mov #newRow, -(sp)
+			jsr pc, print
+			mov #44, (sp)				;'$'
+			jsr pc, printChr			
+			tst (sp)+
+			
+			mov #input, r0
+			mov #input, r1
+			add #124, r1				;adress of end of input
+			mov #101, @#TKS				
+			bis #1, @#TKS				;->
+			wait
+			br .-10 					;<-
+			halt
+openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!\0>
+.even 
+newRow: .ascii<\r\n\0>
+.even
+startMsg: .ascii<Starting a new game\0>
+.even			
+cntExe1: .ascii<Cannot execute "\0>
+.even
+cntExe2: .ascii<".\0>
+.even
+input: .blkw 31
+	   .byte 0  		;up to 50(decimal) chars	
+.even
+
+roleW: .blkw 1
+timeW: .blkw 1
+roleB: .blkw 1
+timeB: .blkw 1
+gameStat: .blkw 1
+
+
+
+receive: 	;receives input~
+			;assumes r0 points to current pos in input, and r1 to input's end
+			
+			tstb @#TKS
+			bpl .-4
+			clr -(sp)					; 0 |
+			movb @#TKB, (sp)			;char |
+			
+			cmp (sp), #15				;is enter?
+			bne r_check2
+				mov #newRow, (sp)		;<newRow>
+				jsr pc, print
+				jsr pc, readCmd
+				jsr pc, clrInput
+				mov #input, r0
+				mov #newRow, (sp)		;<newRow>
+				jsr pc, print
+				mov #44, (sp)			;'$'
+				jsr pc, printChr
+				br r_end
+				
+	r_check2:
+			cmp (sp), #10				;is BackSpace?
+			bne r_next					;->	
+				cmp r0, #input
+				ble r_end
+				jsr pc, printChr		;char(which is BS) |
+				mov #40, (sp)			; - |
+				jsr pc, printChr				
+				mov #10, (sp)			;BS |
+				jsr pc, printChr
+				tstb -(r0)
+				clrb (r0)
+				br r_end
+	r_next:	cmp r0, r1
+			bge r_end
+			movb @#TKB, (r0)+			;<-
+			jsr pc, printChr
+	r_end:	tst (sp)+					;~empty~
+			rti
+
+print:	;Receives in stack (top to bottom):			
+										;<text> | ...
+										;pc | <text> | ...
+			mov r0, -(sp)				;r0 | pc | <text> | ...
+			mov 4(sp), r0				;r0 now holds the adress to the text
+		;wait until printer is free:
+	p_next1:		
+			cmpb (r0), #0
+			beq p_next2
+		;wait for printer:
+			tstb @#TPS								
+			bpl .-4
+		;then:
+			movb (r0)+, @#TPB
+			br p_next1
+	p_next2:		
+			mov (sp)+, r0				; pc | <text> | ...
+			rts pc
+
+
+printChr:;Receives in stack (top to bottom):			
+										; char | ...
+										;pc | char | ...
+		;wait until printer is free:
+			tstb @#TPS								
+			bpl .-4
+		;then:
+			movb 2(sp), @#TPB
+			rts pc
+
+clrInput:	;sets
+			mov r0, -(sp)
+			mov #input, r0
+			mov r1, -(sp)
+			mov #31, r1
+			clrb (r0)+ 					;maybe put space instead?
+			sob r1, .-2
+			mov (sp)+, r1
+			mov (sp)+, r0
+			rts pc
+			
+startChk:	;receives empty place in stack, to flag whether executed or not
+			;r0 used for iterating over input
+			;r1 used for calculating time
+			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether ex'd or not
+			mov r0, -(sp)				;r0 | pc | 0 | ...
+			mov #input, r0
+			mov r1, -(sp)				;r1 | r0 | pc | 0 | ...
+			clr r1
+			
+			tstb -(r0)					
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;-> 
+			
+			cmpb (r0)+, #163			;'s'
+			bne .+6						; supposed to be sChkX but branch too far
+			cmpb (r0)+, #164			;'t'
+			bne sChkX
+			cmpb (r0)+, #141			;'a'
+			bne sChkX
+			cmpb (r0)+, #162			;'r'
+			bne sChkX
+			cmpb (r0)+, #164			;'t'
+			bne sChkX
+			cmpb (r0), #40				;' '
+			bne sChkX
+						
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;-> 
+			
+			cmpb (r0), #143				;'c'
+			bne sChk1
+				mov #0, RtempW
+				br sChk2				
+		sChk1:	
+			cmpb (r0), #150				;'h'
+			bne sChkX
+				mov #1, RtempW
+				;br sChk2
+				
+		sChk2:
+			tstb (r0)+
+			cmpb (r0), #40				;' '
+			bne sChkX
+		
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;->
+			
+			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
+			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
+		exe1num1:	
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ...
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
+			cmp (sp), #-1
+			bne sChk3
+				tst (sp)+					;r1 | r0 | pc | 0 | ...
+				br sChkX			
+		sChk3:
+			mul #12, r1
+			add (sp), r1
+			
+			cmpb (r0), #40				;' '
+			bne exe1num1
+			mov r1, TtempW
+			tst (sp)+					;r1 | r0 | pc | 0 | ...
+			
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;-> 
+			
+			cmpb (r0), #143				;'c'
+			bne sChk4
+				mov #0, RtempB
+				br sChk5				
+		sChk4:	
+			cmpb (r0), #150				;'h'
+			bne sChkX
+				mov #1, RtempB
+				;br sChk5
+				
+		sChk5:
+			tstb (r0)+
+			cmpb (r0), #40				;' '
+			bne sChkX
+		
+			tstb (r0)+					;<-
+			cmpb (r0), #40 				;' '
+			beq .-6						;->
+			
+			clr r1
+			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
+			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
+		exe1num2:	
+			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ... 
+			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
+			cmp (sp), #-1
+			bne sChk6
+				tst (sp)+					;r1 | r0 | pc | 0 | ...
+				br sChkX			
+		sChk6:
+			mul #12, r1
+			add (sp), r1
+			
+			cmpb (r0), #0				;'\0'
+			beq exe1exe
+			cmpb (r0), #40				;' '
+			beq exe1exe
+			br exe1num2
+					
+		exe1exe:
+			mov r1, TtempB
+			tst (sp)+						;r1 | r0 | pc | 0 | ...
+			mov RtempW, roleW
+			mov TtempW, timeW
+			mov RtempB, roleB
+			mov TtempB, timeB
+			jsr pc, exeStart
+			mov (sp)+, r1
+			mov (sp)+, r0
+			mov #1, 2(sp)
+			rts pc
+			
+		sChkX:
+			mov (sp)+, r1					;r0 | pc | 0 | ...
+			mov (sp)+, r0					;pc | 0 | ...
+			;mov #0, 2(sp)
+			rts pc
+RtempW: .blkw 1
+TtempW: .blkw 1
+RtempB: .blkw 1
+TtempB: .blkw 1
+
+			
+exeStart:
+			mov #1, gameStat
+			mov #startMsg, -(sp)
+			jsr pc, print
+			tst (sp)+
+			rts pc
+			
+trnToNum:	;gets in stack a number that represents an ascii code
+			;*overwrites it* and returns the (oct)number it represents
+			;if it's not a digit at all, returns -1
+										;pc | digit
+			cmp 2(sp), #60
+			blt ttnBad
+			cmp 2(sp), #71
+			bgt ttnBad
+			sub #60, 2(sp)				;pc | actualNum
+			rts pc	
+		ttnBad:
+			mov #-1, 2(sp)				;pc | -1
+			rts pc
+			
+;reads the input and calls the appropriate command, if game status permits
+readCmd:	
+			tst -(sp)						; - | pc
+			cmp gameStat, #1
+			beq rcmd1
+			jsr pc, startChk
+			cmp (sp), #1
+			beq rcmdX
+			br rcmdErr
+			
+		rcmd1:
+			jsr pc, stopChk
+			cmp (sp), #1
+			beq rcmdX
+			jsr pc, timeChk
+			cmp (sp), #1
+			beq rcmdX
+			cmp Player, #1
+			bgt	rcmd2
+				cmp roleW, #1
+				beq rcmd3
+					br rcmdErr
+		rcmd2:
+				cmp roleB, #1
+				beq rcmd3
+					br rcmdErr
+			
+		rcmd3:
+			jsr pc, moveChk
+			cmp (sp), #1
+			beq rcmdX
+			
+		rcmdErr:
+			mov #cntExe1, -(sp)				;<cantExecute1> | 0 | pc | ...
+			jsr pc, print
+			mov #input, (sp)				;<input> | 0 | pc | ...
+			jsr pc, print
+			mov #cntExe2, (sp)				;<cantExecute2> | 0 | pc | ...
+			jsr pc, print	
+			tst (sp)+
+		rcmdX:
+			tst (sp)+
+			rts pc
+			
+stopChk: 
+		mov #0, 2(sp)
+		mov r0, -(sp)
+		mov #input, r0
+		
+		cmpb (r0)+, #163			;'s'
+		bne stpChkX
+		cmpb (r0)+, #164			;'t'
+		bne stpChkX
+		cmpb (r0)+, #157			;'o'
+		bne stpChkX
+		cmpb (r0)+, #160			;'p'
+		bne stpChkX
+		cmpb (r0), #0				;'\0'
+		beq stpChk1
+		cmpb (r0), #40				;' '
+		beq stpChk1
+	stpChkX:
+		mov (sp)+, r0
+		rts pc
+	
+	stpChk1:
+		mov #1, 4(sp)
+		jsr pc, exeStop
+		br stpChkX
+		
+		
+exeStop: ;stops.
+		mov #stopMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+stopMsg: .ascii<STOP!>
+.even
+		
+timeChk: 
+		mov #0, 2(sp)
+		mov r0, -(sp)
+		mov #input, r0
+		
+		cmpb (r0)+, #164			;'t'
+		bne tChkX
+		cmpb (r0)+, #151			;'i'
+		bne tChkX
+		cmpb (r0)+, #155			;'m'
+		bne tChkX
+		cmpb (r0)+, #145			;'e'
+		bne tChkX
+		cmpb (r0), #0				;'\0'
+		beq tChk1
+		cmpb (r0), #40				;' '
+		beq tChk1
+	tChkX:
+		mov (sp)+, r0
+		rts pc
+	
+	tChk1:
+		mov #1, 4(sp)
+		jsr pc, exeTime
+		br tChkX
+		
+exeTime: ;tells time.
+		mov #timeMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+timeMsg: .ascii<TIME!>
+.even
+			
+moveChk: 
+		mov #0, 2(sp)				;pc | 0
+		mov r0, -(sp)				;r0 | pc | 0
+		mov #input, r0
+		mov r1, -(sp)				;r1 | r0 | pc | 0 |...
+		
+		cmpb (r0)+, #155			;'m'
+		bne mChkX
+		cmpb (r0)+, #157			;'o'
+		bne mChkX
+		cmpb (r0)+, #166			;'v'
+		bne mChkX
+		cmpb (r0)+, #145			;'e'
+		bne mChkX
+		cmpb (r0), #40				;' '
+		bne mChkX
+		;skip spaces:
+		tstb (r0)+					;<-
+		cmpb (r0), #40 				;' '
+		beq .-6						;->
+		
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;multiply by 8, and then by 2:
+		asl r1
+		asl r1
+		asl r1						;again? ask uriya
+		add r1, tempSrc
+		
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;ask uriya
+		add r1, tempSrc
+		
+		cmpb (r0), #40				;' '
+		bne mChkX
+		tstb (r0)+					;<-
+		cmpb (r0), #40 				;' '
+		beq .-6						;->
+				
+		clr -(sp)					; - | r0
+		movb (r0)+, (sp)			;char | r0
+		jsr pc, trnToNum			;*num* | r0
+		mov (sp)+, r1				;r0
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;multiply by 8, and then by 2 (because each word is 2 bytes):
+		asl r1
+		asl r1
+		asl r1						
+		add r1, tempDst
+		
+		clr -(sp)					; - | r1 | r0 | pc | 0 |...
+		movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 |...
+		jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 |...
+		mov (sp)+, r1				;r1 | r0 | pc | 0 |...
+		cmp r1, #-1
+		beq mChkX
+		cmp r1, #10					;means the digit is 8 or 9, which is invalid
+		bge mChkX
+		asl r1						;multiply by 2 (because each word is 2 bytes):
+		add r1, tempDst
+				
+		cmpb (r0), #0				;'\0'
+		beq mChk1
+		cmpb (r0), #40				;' '
+		beq mChk1
+	mChkX:
+		clr tempSrc
+		clr tempDst
+		mov (sp)+, r1				;r0 | pc | -
+		mov (sp)+, r0				;pc | -
+		rts pc
+	
+	mChk1:
+		mov tempSrc, SrcPos
+		mov tempDst, DstPos
+		tst -(sp)					; - | r1 | r0 | pc | 0 |...
+		jsr pc, exeMove				;0/1 | r1 | r0 | pc | 0 |...
+		cmp (sp), #1
+		bne .+10 					;->
+		mov #1, 10(sp)
+		tst (sp)+					;<-
+									;r1 | r0 | pc | 0 |...
+		br mChkX
+tempSrc: .blkw 1
+tempDst: .blkw 1
+
+
+
+exeMove: ;plays move.
+		mov #moveMsg, -(sp)
+		jsr pc, print
+		tst (sp)+
+		rts pc
+moveMsg: .ascii<MOVE!>	
+.even		
+
+;~~~~~from here on it's ATAM3:~~~~~
+
+
+			
+	;checks if player has any playpieces on board, if not that is not a winning situation
+
+checkWin:	
+			mov r0, -(sp)				;preservation of registers, now used to hold current players
+										;| - | board address | player | reg link | r0 |
+
+		;we pass parameters for the next function
+		
+			tst -(sp)					;| - | board address | player | reg link | r0 | - |
+			mov 8(sp), -(sp)			;| - | board address | player | reg link | r0 | - | board address |
+			mov 8(sp), -(sp)			;| - | board address | player | reg link | r0 | - | board address | player |
+			jsr pc, cntPlay				;| - | board address | player | reg link | r0 | number of player pieces | board address | player |
+			mov 4(sp), PlayCnt			
+			bne countP2					;if PlayCnt is 0 we know for sure hasn't won
+				br PLYnoWIN
+
+		;checks if *Adversary* has any playpieces on board, if not player has won
+			
+	countP2:
+			mov #3,r0					;used to get the number of the other player
+			sub 12(sp),r0				;
+			mov r0, (sp)				;| - | board address | player | reg link | r0 | number of player pieces | board address | *Adversary* |
+			jsr pc, cntPlay				;| - | board address | player | reg link | r0 | number of *Adversary* pieces | board address | *Adversary* |
+			mov 4(sp), OppCnt
+			bne movesP1					;if *Adversary* play piece count is 0, player has won
+				br playWin
+
+		;checks if player has any moves to make.
+			
+	movesP1:
+			mov 12(sp), (sp)			;| - | board address | player | reg link | r0 | number of *Adversary* pieces | board address | player |
+			jsr pc, cntMoves			;| - | board address | player | reg link | r0 | player possible moves | board address | player |
+			tst 4(sp)					;check if has more than 0 moves for player
+			beq movesP2
+				br PLYnoWIN
+
+		;checks if *Adversary* has any moves to make. if both players can't move count difference between playpiece number
+	
+	movesP2:
+			mov r0, (sp)				;| - | board address | player | reg link | r0 | player possible moves | board address | *Adversary* |
+			jsr pc, cntMoves			;| - | board address | player | reg link | r0 | *Adversary* possible moves | board address | *Adversary* |
+			tst 4(sp)					;check if has more than 0 moves for *Adversary*
+			beq findDiff
+				br PLYnoWIN
+			
+		;finds who wins by checking who has more pieces on board		
+			
+	findDiff:	
+			cmp PlayCnt, OppCnt			;if no moves left and player has more piece announce win
+			bgt playWin
+				br PLYnoWIN
+			
+		;unwraps routines and empties stack, win flag is up
+			
+	playWin:	
+			add #6, sp					;| - | board address | player | reg link | r0 |
+			mov (sp)+, r0				;| - | board address | player | reg link |
+			mov #1, 6(sp)				;| 1 | board address | player | reg link |
+			rts pc
+			
+		;unwraps routines and empties stack, no known win flag is up
+			
+	PLYnoWIN:
+			add #6, sp					;| - | board address | player | reg link | r0 |
+			mov (sp)+, r0				;| - | board address | player | reg link |
+			mov #-1, 6(sp)				;| -1 | board address | player | reg link |
+			rts pc
+
+PlayCnt:	.blkw 1
+OppCnt:		.blkw 1
+
+
+
+
+
+			
+			
+gwpaPrep:								;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3
+			;getting ready for makeMov:
+			mov r4, -(sp)				;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4
+			mov r5, -(sp)				;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
+			mov 14(sp), r4				
+			mov 10(sp),  r5
+			mov 26(sp), -(sp)			;STACK: ..., #Board
+			mov 26(sp), -(sp)			;STACK: ..., #Board, #Player
+			mov 26(sp), -(sp)			;STACK: ..., #Board, #Player, Steps
+			mov 36(sp), -(sp)			;STACK: ..., #Board, #Player, Steps, tempWP
+			mov 30(sp), -(sp)			;STACK: ..., #Board, #Player, Steps, tempWP, curPlayer
+			jsr pc, makeMov				;STACK: ..., #Board, #Player, Steps, newWP, curPlayer
+			mov 2(sp), 42(sp)			;assign new WP
+			add #12, sp					;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
+			mov (sp)+, r5				;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4
+			mov (sp)+, r4				;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3
+			rts pc
+			
+			
+			
+			
+
+gwpBlack: 								;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, - , - , - , pc2
+			mov #-2, 6(sp) 				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, -2, - , -, pc2
+		gwpLoopB:		
+			add #2, 6(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, - , -, pc2
+			cmp 6(sp), #160
+			blt gwpBnxt1				;if reached end of board, stops
+				rts pc
+		gwpBnxt1:
+			mov 6(sp), 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , index, pc2
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , #Board+index, pc2
+			cmp @2(sp), #Black			;checks if tile has black
+			bne gwpLoopB				;if not, check next tile
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , index, pc2
+			jsr pc, isOnLeft			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on left border
+			beq gwpRB					;if it is, check right move
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, #Board+index, pc2
+			add #16, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			bgt gwpRB 					;if contains black, check right move 
+			blt gwpBnxt2				;if empty, continue to recursion
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, stepIndex, pc2
+			jsr pc, isOnBtm				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpRB					;if it is, check right move
+			
+			jsr pc, isOnLeft			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on left side
+			beq gwpRB					;if it is, check right move
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, #Board+stepIndex, pc2
+			add #16, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if left LEAP tile is empty or not
+			bne gwpRB					;if it's not, check right move
+		
+		gwpBnxt2:
+			;YAY RECURSION MUCH FUN YAY
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2
+			jsr pc, prepMov
+			
+		gwpRB:
+			mov 6(sp), 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, index, pc2
+			jsr pc, isOnRght			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on Right border
+			beq gwpLoopB				;if it is, check next tile
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, #Board+index, pc2
+			add #22, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			bgt gwpLoopB 				;if contains black, check next tile
+			blt gwpBnxt3				;if empty, continue to recursion
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, stepIndex, pc2
+			jsr pc, isOnBtm				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpLoopB				;if it is, check next tile
+			
+			jsr pc, isOnRght			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if right move tile is on right side
+			beq gwpLoopB				;if it is, check next tile
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, #Board+stepIndex, pc2
+			add #22, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if right LEAP tile is empty or not
+			bne gwpLoopB				;if it's not, check next tile
+			
+		gwpBnxt3:
+			;YAY RECURSION MUCH FUN YAY
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2
+			jsr pc, prepMov
+			jmp gwpLoopB
+			
+			
+			
+prepMov:								;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2, pc3
+			;getting ready for makeMov:
+			mov 10(sp), r4				
+			mov 4(sp),  r5
+			mov #Board, -(sp)			;STACK: ..., #Board
+			mov #Player, -(sp)			;STACK: ..., #Board, #Player
+			mov Steps, -(sp)			;STACK: ..., #Board, #Player, Steps
+			mov (r1), -(sp)				;STACK: ..., #Board, #Player, Steps, tempMax
+			mov Player, -(sp)			;STACK: ..., #Board, #Player, Steps, tempMax, curPlayer
+			jsr pc, makeMov				;STACK: ..., #Board, #Player, Steps, MAX_WP, curPlayer
+			cmp 2(sp), (r1)				;assign the new MAX_WP and the previous one
+			ble prepNext
+			;if the new MAX_WP is bigger, update output:
+			mov 2(sp), (r1)
+			mov r4, (r2)
+			mov r5, (r3)
+		prepNext:
+			add #12, sp					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2, pc3
+			rts pc
+			
+			
+			
+			
+			
+gwpWhite: 
+			mov #200, 6(sp) 			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, -2, - , -, pc2
+		gwpLoopW:		
+			sub #2, 6(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, - , -, pc2
+			cmp 6(sp), #20
+			bge gwpWnxt1				;if reached end of board, stops
+				rts pc
+		gwpWnxt1:
+			mov 6(sp), 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , index, pc2
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , #Board+index, pc2
+			cmp @2(sp), #White			;checks if tile has white
+			bne gwpLoopW				;if not, check next tile
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, - , index, pc2
+			jsr pc, isOnLeft			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on left border
+			beq gwpRW					;if it is, check right move
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, #Board+index, pc2
+			sub #22, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			beq gwpRW 					;if contains white, check right move 
+			blt gwpWnxt2				;if empty, continue to recursion
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result*, stepIndex, pc2
+			jsr pc, isOnTop				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpRW					;if it is, check right move
+			
+			jsr pc, isOnLeft			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on left side
+			beq gwpRW					;if it is, check right move
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, #Board+stepIndex, pc2
+			sub #22, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if left LEAP tile is empty or not
+			bne gwpRW					;if it's not, check right move
+		
+		gwpWnxt2:
+			;YAY RECURSION MUCH FUN YAY
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2
+			jsr pc, prepMov
+			
+		gwpRW:
+			mov 6(sp), 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, index, pc2
+			jsr pc, isOnRght			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on Right border
+			beq gwpLoopW				;if it is, check next tile
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, #Board+index, pc2
+			sub #16, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			beq gwpLoopW 				;if contains white, check next tile
+			blt gwpWnxt3				;if empty, continue to recursion
+			
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result*, stepIndex, pc2
+			jsr pc, isOnTop				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpLoopW				;if it is, check next tile
+			
+			jsr pc, isOnRght			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if right move tile is on right side
+			beq gwpLoopW				;if it is, check next tile
+			
+			add #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, #Board+stepIndex, pc2
+			sub #16, 2(sp)				;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if right LEAP tile is empty or not
+			bne gwpLoopW				;if it's not, check next tile
+			
+		gwpWnxt3:
+			;YAY RECURSION MUCH FUN YAY
+			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r6, r1, r0, r2, r3, srcIndex, - , dstIndex, pc2
+			jsr pc, prepMov
+			jmp gwpLoopW
+
+
+
+movPiece:
+										;| STACK: #Board, reg link (r5)
+										;input:	SourcePosition - inline (r5++)
+										;		DestinPosition - inline (r5+2)
+										
+			mov r0, -(sp)				;| #Board | reg link | r0 |
+			mov 4(sp), r0				;asign Board address to r0 
+			mov r1, -(sp)				;| #Board | reg link | r0 | r1 |
+			mov (r5)+, r1				;assign SrcPos to r1
+			mov r2, -(sp)				;| #Board | reg link | r0 | r1 | r2 |
+			mov r3, -(sp)				;| #Board | reg link | r0 | r1 | r2 | r3 |
+			mov (r5)+, r2				;assign DstPos to r2
+			add r0, r1					;add boardPos to SrcPos in order to get the actual adress
+			add r0, r2					;add boardPos to DstPos in order to get the actual adress 
+			
+			mov (r1), r3				;save player in SrcPos
+			mov #0, (r1)				;assign 0 to SrcPos
+			mov r3, (r2)				;assign player in SrcPos to DstPos
+			mov (sp)+, r3				;| #Board | reg link | r0 | r1 | r2 |
+			mov (sp)+, r2				;| #Board | reg link | r0 | r1 |
+			mov (sp)+, r1				;| #Board | reg link | r0 |
+			mov (sp)+, r0				;| #Board | reg link |
+			
+			rts r5			
+			
+			
+			
+			
+			
+getMaxWP:	;Returns the best move to do and its WP
+										;| STACK: SrcPos, DstPos, WinParam, pc
+			;check if Player Won:			
+			mov r1, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 |
+			mov 4(sp), r1				;r1 now holds WinParam address
+			mov r4, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 | r4 |
+			mov 12(sp), r4				;r4 now holds SrcPos address
+			mov r5, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 |
+			mov 12(sp), r5				;r5 now holds DstPos
+			mov r0, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 | r0 |
+			mov r2, -(sp)				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 |
+			mov r3, -(sp)				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 |
+			clr r0						;now used as an index for board tiles
+			clr r2						; 
+			clr r3						;both now used for calculations
+			
+			;getting ready for checkWin, if board was already at winning position we need to return 20 as WP and the src and dst of one of player's playpiece
+										
+			tst -(sp)					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | - |
+			mov #Board, -(sp)			;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | - | #Board |
+			mov Player, -(sp)			;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | - | #Board | Player |
+			jsr pc, checkWin			;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* | #Board | Player | 
+			cmp 4(sp), #1				;if Player hasn't won yet
+			bne gwpNext1					;then continue
+			
+			;else release everything and return:
+				mov #Win, (r1)				;return 20 WP
+				mov #Board, r0				;if board was already in a winning position we need to return a src and dst
+				add #200, r0
+		loopFindPlayer:		
+				sub #2, r0
+				cmp r0, #Board
+				bge lfpNext
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* | #Board |
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* |
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 |
+					br return
+			lfpNext:
+				cmp (r0), Player
+				bne loopFindPlayer
+					sub #Board, r0
+					mov r0, (r4)
+					mov r0, (r5)
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* | #Board |
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* |
+					tst (sp)+					;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 |
+		return:
+					mov (sp)+, r3				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 |
+					mov (sp)+, r2				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 |
+					mov (sp)+, r0				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 |
+					mov (sp)+, r1				;| SrcPos | DstPos | WinParam | pc | r5 | r4 |
+					mov (sp)+, r4				;| SrcPos | DstPos | WinParam | pc | r5 |
+					mov (sp)+, r5				;| SrcPos | DstPos | WinParam | pc |
+					rts pc
+					
+		;check if Adversary won:		
+		gwpNext1:						;STACK: SrcPos, DstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result*, #Board, Player
+			mov (sp), r2
+			neg r2						;turning player to adversary (1 to 2 and 2 to 1)
+			add #3, r2					;turning player to adversary (1 to 2 and 2 to 1)
+			mov r2, (sp)				;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result* | #Board | *Adversary* | 
+			jsr pc, checkWin			;| SrcPos | DstPos | WinParam | pc | r5 | r4 | r1 | r0 | r2 | r3 | *result2* | #Board | *Adversary* | 
+			cmp 4(sp), #1
+			bne gwpNext2				;If checkWin retuned -1, continue normally
+			;else release everything and return:
+				mov #Loss, (r1)				;return -20 WP
+				mov #Board, r0				;if board was already in a winning position we need to return a src and dst
+				add #2, r0
+				br loopFindPlayer
+		
+		;check if steps == 0:		
+		gwpNext2:						;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result2*, #Board, *Adversary*
+			mov Player, (sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result2*, #Board, Player
+			cmp Steps, #0				;
+			bne gwpNext3				;
+			;releasing everything and returning:
+				jsr pc, calcWP				;calcWP; puts result in r4
+				mov r4, (r1)				;return calcWP
+				tst (sp)+					;STACK: #srcPos, #dstPos, pc, r5, r4, r1, r0, r2, r3, *result2*, #Board
+				tst (sp)+					;STACK: #srcPos, #dstPos, pc, r5, r4, r1, r0, r2, r3, *result2*
+				tst (sp)+					;STACK: #srcPos, #dstPos, pc, r5, r4, r1, r0, r2, r3
+				br return
+		
+		;if both players can't move, return tie. if only player can't, skip turn
+		gwpNext3:						;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, result2, #Board, Player
+			jsr pc, cntMoves			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *PlayerMoves*, #Board, Player
+			tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *PlayerMoves*, #Board
+			cmp 2(sp), #0				;check whether Player can make a move
+			bgt gwpNext5				;if so, continue normally
+			;else check if Adversary can make moves:
+				mov Player, -(sp)		;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *PlayerMoves*, #Board, Player
+				neg (sp)				;turn Player into Adversary
+				add #3, (sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, PlayerMoves, #Board, *Adversary*
+				jsr pc, cntMoves		;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, Adversary
+				cmp 4(sp), #0			;check whether Adversary can make a move 
+				bgt gwpNext4			;if so, skip Player's turn
+				;else, return tie (if one of the players has more pieces than the other it would have returned 20 or -20 by now)
+					mov #Tie, (r1)		
+					mov Player, (sp)	;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, Player
+					mov #Board, r0
+					add #200, r0
+					br loopFindPlayer	
+				
+			gwpNext4:					;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, Adversary
+				mov #Player, (sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player
+				mov Steps, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps
+				mov #Lowest, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, -21
+				mov Player, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, -21, Player
+				mov #0, r4				;assign the same position to both SrcPos and DstPos, so it won't make any move
+				mov #0, r5
+				jsr pc, makeMov			;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, finalWP, Player
+				mov 2(sp), (r1)
+				tst (sp)+				;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, finalWP
+				tst (sp)+				;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps
+				tst (sp)+				;STACK: #srcPos, #dstPos, #WinParam, pc, r5, r4, r1, r0, r2, r3, *AdversaryMoves*, #Board, #Player
+				mov 30(sp), r4
+				mov 26(sp), r5
+				mov #Board, r0
+				add #200, r0
+				br loopFindPlayer
+				
+				
+		gwpNext5:	;Checks which color is the player, and enters the respective recursion loop 						
+										;|STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, - , #Board
+										;| r0 - /accidently not used oops/ 
+										;| r1 - #WinParam 
+										;| r2 - #finalSrcPos 
+										;| r3 - #finalDstPos 
+										;| r4 - tempSrcPos 
+										;| r5 - tempDstPos
+			mov 26(sp), r2 				;assgin the adress of the final SrcPos 
+			mov 24(sp), r3 				;assign the adress of the final DstPos
+			mov 22(sp), r1				;assign the adress of the final WinParam
+			mov #Lowest, (r1)			;temporarily assign a number lower than lowest score possible to WP 
+			tst -(sp)					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result3*, #Board, -
+			cmp Player, #White			;check if current player is white or black
+			beq gwpDoW
+			jsr pc, gwpBlack
+			
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result3*, #Board
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result3*
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3
+				br return
+			
+		gwpDoW:
+			jsr pc, gwpWhite
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result3*, #Board
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3, *result3*
+				tst (sp)+					;STACK: #srcPos, #dstPos, WinParam, pc, r5, r4, r1, r0, r2, r3
+				br return
+
+
+
+calcWP:	
+		;passes parameters for next function through the stack
+		;								#Board, in stack
+		;								Player, in stack
+		;								returns WP in check
+			
+			tst -(sp)					;| board address | player | link reg | - |
+			mov 6(sp), -(sp)			;| board address | player | link reg | - | board address |
+			mov 6(sp), -(sp)			;| board address | player | link reg | - | board address | player |
+			jsr pc, cntPlay				;| board address | player | link reg | number of pieces for player | board address | player |
+			
+			mov (sp), r4				;we want to check now how many playpieces the other player has
+			neg r4
+			add #3, r4
+			mov r4, (sp)				;| board address | player | link reg | number of pieces for player | board address | *Adversary* |
+			mov 4(sp), r4				
+			jsr pc, cntPlay
+			sub 4(sp), r4				;now r4 holds the WP
+			add #6, sp					;| board address | player | link reg |
+			rts pc
+			
+;~~~~
+
+
+
+
+	;counts play pieces for current player
+	;									
+	
+cntPlay:
+					; | STACK:    -    , #Board, Player, pc 
+					;input:		empty space for output				- in stack
+					;			board address						- in stack
+					;			player for which win is checked		- in stack
+					;output:	number of play pieces for player	- in stack in empty space
+			
+			mov r0, -(sp)				;preserve r0, now used to hold the player's num
+			mov 4(sp), r0
+			mov r1, -(sp)				;preserve r1, now used to hold the address of board's tiles
+			mov 10(sp), r1	
+			mov r1, BoardS
+			mov r2, -(sp)
+			clr r2						;preserve r2, now used to count playpieces
+			
+			add #200, r1
+			
+			
+	loop1:
+			dec r1
+			dec r1
+			cmp r1, BoardS
+			blt exit2
+			
+				cmp (r1), r0
+				bne loop1
+			
+					inc r2
+					br loop1
+	exit2:		
+	
+			mov r2, 14(sp)
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0
+			rts pc
+
+	BoardS:	.blkw 1						;gonna hold the addresses of the end of the game board and beginning
+
+
+
+
+
+
+
+;~~~~
+
+
+
+	
+canMove:	;checks if both players can't move, if so returns 1, else returns -1
+			tst -(sp)					;| - | board address | link reg | - |
+			mov 4(sp), -(sp)			;| - | board address | link reg | - | board address | 
+			mov #1, -(sp)				;| - | board address | link reg | - | board address | 1 |
+			jsr pc, cntMoves			;| - | board address | link reg | (moves for player 1) | board address | 1 |
+			tst 4(sp)
+			bne cmExit2
+			
+				mov #2, (sp)			
+				jsr pc, cntMoves		;| - | board address | link reg | (moves for player 2) | board address | 2 |
+				tst 4(sp)
+				bne cmExit2
+			
+					mov #1, 12(sp)		;if none can move, we want to return 1
+					add #6, sp
+					rts pc
+					
+cmExit2:		mov #-1, 12(sp)				;can move, return -1
+			add #6, sp
+			rts pc
+			
+			
+			
+			
+
+;~~~~			
+			
+			
+			
+			
+			
+makeMov:	;makes a move and checks the best WP awarded by this move
+										;input:	 	src tile 								- in r4
+										;			dest tile								- in r5
+										;			Board address 							- in stack
+										;			player address							- in stack
+										;			steps left								- in stack
+										;			local_max or min to compare the WP with - in stack
+										;			current player 							- in stack
+										;output: 	best WP awarded by the move when using the minimax algorithm - updated in stack in the stead of the local_max
+										
+					;| STACK: Board address, #player, steps left, local_max or min, current player, pc (link reg)
+					
+			mov r0, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 |
+			mov r1, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 |
+			mov r2, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 |
+			clr r0						;used for calculations
+			clr r1						;used for calculations
+			clr r2						;used for calculations
+			tst -(sp)					;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | - |
+			mov 22(sp), -(sp)			;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | - | #Board |
+										;preparation for movPiece function
+			mov r4, MovSrc				;
+			mov r5, MovDst				;preparation for the movpiece function
+			jsr r5, movPiece
+			MovSrc:		.blkw 1
+			MovDst:		.blkw 1
+			
+			mov 22(sp), -(sp)			;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | - | #Board | #Player |
+			mov 22(sp), r1				;move steps into r1 to decrease, since we are going one level deeper in recursion
+			dec r1
+			mov r1, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | - | #Board | #Player | steps - 1 |
+			
+			mov r4, r0					;preperation for a check if move is a leap
+			sub r5, r0					;
+			bgt positive				;
+				neg r0					;absolute value |r0|
+		positive:
+			cmp r0, #SkipF				;comparing the distance jumped (r0) and farthest distance traversed in a one tile diagonal move (SkipFar)
+										;r0 > skipF only if a leap has occured
+			ble noLeap
+				mov r4, r2					;
+				add r5, r2					;
+				asr r2						;used to delete leapt over piece
+				mov #0, Board(r2)
+				
+		noLeap:
+				;if no leap occured can start recursion immidiately, otherwise, delete leapt over player and then start recursion
+			mov 20(sp), r1				;move curr_player to register
+			neg r1						;
+			add #3, r1					;used to change player for the next turn (getWP_aux)
+			mov r1, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | - | #Board | #Player | steps - 1 | adversary |
+			jsr pc, getWP_aux			;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | *local_max or min of son* | #Board | #Player | - >
+										;- >	  | steps - 1 | adversary |
+			add #6, sp					;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board |
+			mov r4, -(sp)				;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 |
+										;preparation for minOrMax function, which returns its result in r4
+			mov 16(sp), -(sp)			;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 | curr_player |
+			mov 26(sp), -(sp)			;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 | curr_player | #Player |
+			jsr pc, minOrMax
+			add #4, sp					;| #Board | #Player | steps | local_max or min | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 |
+
+			tst r4						;if = 1, we want to find the maximum of the results gathered by a recursive call to getWP_aux
+			blt findMin
+				cmp 4(sp), 20(sp)			;r4 is indicating we are looking for a maximal value, if the local_max or min of tree's son is bigger than value -
+				blt reverse					; - in root (20(sp)), replace it and start undoing move				
+					mov 4(sp), 20(sp)			;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 |
+					br reverse					
+		findMin:	
+		
+			cmp 4(sp), 20(sp)			;r4 is indicating we are looking for a minimal value, if local_max or min of tree's son is smaller than value in root (20(sp)) -
+			bgt reverse					; - replace it and start undoing move
+				mov 4(sp), 20(sp)				;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 | r2 | local_max or min of son | #Board | r4 |
+			
+		reverse:
+		
+			mov (sp), r4				;move src pos back from stack into r4
+			add #6, sp					;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 | r2 |
+			cmp r0, #SkipF				;comparing the distance jumped (r0, calculated earlier in code) and farthest distance traversed in a one tile -
+										; - diagonal move (SkipFar) r0 > skipF only if a leap has occured
+			ble noLeapReverse
+				mov 10(sp), r1				;r1 has the value of current player now
+				neg r1						;
+				add #3, r1					;using r1 to recreate the number of player whose piece was destroyed by being leapt over.
+				mov r1, Board(r2)			;r2 is the pointer to the tile where the leapt over piece was
+				
+		noLeapReverse:
+
+			mov 20(sp), -(sp)			;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 | r2 | #Board |
+			mov r4, RvrsDst				;
+			mov r5, RvrsSrc				;preparation for the movpiece function to undo game move
+			jsr r5, movPiece
+				
+			RvrsSrc:	.blkw 1
+			RvrsDst:	.blkw 1
+			
+			tst (sp)+					;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 | r2 |
+			mov (sp)+, r2				;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 | r1 |
+			mov (sp)+, r1				;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc | r0 |
+			mov (sp)+, r0				;| #Board | #Player | steps | local_max or min (updated) | curr_player | pc |
+			rts pc
+			
+			
+
+minOrMax:	;returns whether we currently look for maximum WP or minimum WP 
+										;		 	curPlayer 								- in stack
+										;			#Player									- in stack
+										;output:	1 if max, -1 if min						- in r4
+										;STACK: curPlayer, #Player, pc
+			mov #1, r4
+			cmp 4(sp), @2(sp)
+			beq momNext
+			mov #-1, r4
+		momNext:
+			rts pc			
+			
+			
+			
+			
+			
+			
+getWP_aux:
+		;returns the best WP for curPlayer
+										
+										;			empty space for output 					- in stack
+										;			#Board									- in stack
+										;			#originPlayer							- in stack
+										;			steps left								- in stack
+										;			curPlayer	 							- in stack
+										;output: 	the best WP for curPlayer
+										;STACK: - , #Board, #Player, steps, curPlayer, pc
+			;getting ready for checkWin, if board was already at winning position we need to return 20 as WP and the src and dst of one of player's playpiece
+			tst -(sp)					;STACK: - , #Board, #Player, steps, curPlayer, pc, - 
+			mov 12(sp), -(sp)			;STACK: - , #Board, #Player, steps, curPlayer, pc, - , #Board
+			mov @12(sp), -(sp)			;STACK: - , #Board, #Player, steps, curPlayer, pc, - , #Board, Player
+			jsr pc, checkWin			;STACK: - , #Board, #Player, steps, curPlayer, pc, *result*, #Board, Player
+			cmp 4(sp), #1				;if Player hasn't won yet
+			bne gwpaBr1					;then continue
+			;else release everything and return:
+				mov #Win, 20(sp)			;STACK: 20, #Board, #Player, steps, curPlayer, pc, *result*, #Board, Player
+				tst (sp)+					;STACK: 20, #Board, #Player, steps, curPlayer, pc, *result*, #Board
+				tst (sp)+					;STACK: 20, #Board, #Player, steps, curPlayer, pc, *result*
+				tst (sp)+					;STACK: 20, #Board, #Player, steps, curPlayer, pc
+				rts pc
+				
+		gwpaBr1:
+			neg (sp)
+			add #3, (sp)				;STACK: - , #Board, #Player, steps, curPlayer, pc, *result*, #Board, *Adversary*
+			jsr pc, checkWin			;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, #Board, *Adversary*
+			cmp 4(sp), #1				;if Adversary hasn't won yet
+			bne gwpaBr2					;continue
+			;else release everything and return:
+				mov #Loss, 20(sp)			;STACK: -20, #Board, #Player, steps, curPlayer, pc, *result2*, #Board, *Adversary*
+				tst (sp)+ 					;STACK: -20, #Board, #Player, steps, curPlayer, pc, *result2*, #Board
+				tst (sp)+					;STACK: -20, #Board, #Player, steps, curPlayer, pc, *result2*
+				tst (sp)+					;STACK: -20, #Board, #Player, steps, curPlayer, pc
+				rts pc
+				
+		gwpaBr2:
+			mov @14(sp), (sp)			;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, #Board, Player
+			cmp 12(sp), #0				;check if any steps left
+			bne gwpaBr3					;if there are, continue
+			;else release everything and return:
+				tst (sp)+					;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*, #Board
+				tst (sp)+					;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*
+				mov r4, -(sp)				;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, ^r4
+				mov 14(sp), -(sp)			;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, ^r4, #Board
+				mov @14(sp), -(sp)			;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, ^r4, #Board, originPlayer
+				jsr pc, calcWP				;calcWP, puts result in r4
+				mov r4, 22(sp)				;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*, ^r4, #Board, originPlayer
+				tst (sp)+					;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*, ^r4, #Board
+				tst (sp)+					;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*, ^r4
+				mov (sp)+, r4				;STACK: newWP, #Board, #Player, steps, curPlayer, pc, *result2*
+				tst (sp)+					;STACK: newWP, #Board, #Player, steps, curPlayer, pc
+				rts pc
+					
+		gwpaBr3:
+			tst (sp)+					;STACK: - , #Board, #Player, steps, curPlayer, pc, *result2*, #Board
+			jsr pc, canMove				;STACK: - , #Board, #Player, steps, curPlayer, pc, *result3*, #Board
+			cmp 2(sp), #1				;both players can't move?
+			bne gwpaBr4					;if not (=if one of them can move), continue
+			;else release everything and return:
+				mov #0, 16(sp) 				;STACK: 0, #Board, #Player, steps, curPlayer, pc, *result3*, #Board
+				tst (sp)+					;STACK: 0, #Board, #Player, steps, curPlayer, pc, *result3*
+				tst (sp)+					;STACK: 0, #Board, #Player, steps, curPlayer, pc
+				rts pc
+				
+		gwpaBr4:
+			mov #Lowest, 16(sp) 
+			mov r4, -(sp)				;STACK: L , #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4
+			mov 10(sp), -(sp)			;STACK: L , #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4, curPlayer
+			mov 16(sp), -(sp)			;STACK: L , #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4, curPlayer, #Player
+			jsr pc, minOrMax
+			cmp r4, #1
+			beq gwpaBr5
+			mov #Highest, 24(sp)		;STACK: H , #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4, curPlayer, #Player
+		gwpaBr5:
+			tst (sp)+					;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4, curPlayer
+			tst (sp)+					;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, *result3*, #Board, ^r4
+			mov (sp), r4
+			
+			cmp 10(sp), #White
+			beq gwpaW
+			jsr pc, gwpaDoB
+			;release everything and return:
+			return2:
+				tst (sp)+					;STACK: - , #Board, #Player, steps, curPlayer, pc, *result3*, #Board
+				tst (sp)+					;STACK: - , #Board, #Player, steps, curPlayer, pc, *result3*
+				tst (sp)+					;STACK: - , #Board, #Player, steps, curPlayer, pc
+				rts pc
+		gwpaW:
+			jsr pc, gwpaDoW
+				br return2
+				
+				
+				
+				
+gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -, pc2
+			mov #-2, 6(sp) 				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, -2 , - , -, pc2 
+		gwpaBbr1:		
+			add #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
+			cmp 6(sp), #160
+			blt gwpaBbr2				;if reached end of board, stops
+				rts pc
+		gwpaBbr2:
+			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
+			cmp @2(sp), #Black			;checks if tile has black
+			bne gwpaBbr1				;if not, check next tile
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
+			jsr pc, isOnLeft			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on left border
+			beq gwpaRB					;if it is, check right move
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+index, pc2
+			add #16, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			bgt gwpaRB 					;if contains black, check right move 
+			blt gwpaBbr3				;if empty, continue to recursion
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, stepIndex, pc2
+			jsr pc, isOnBtm				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpaRB					;if it is, check right move
+			
+			jsr pc, isOnLeft			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on left side
+			beq gwpaRB					;if it is, check right move
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+stepIndex, pc2
+			add #16, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if left LEAP tile is empty or not
+			bne gwpaRB					;if it's not, check right move
+		
+		;the recursion part:
+		gwpaBbr3:
+			;YAY RECURSION MUCH FUN YAY
+			sub #Board, 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2
+			jsr pc, gwpaPrep
+			
+		gwpaRB:
+			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			jsr pc, isOnRght			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on Right border
+			beq gwpaBbr1				;if it is, check next tile
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+index, pc2
+			add #22, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			bgt gwpaBbr1 				;if contains black, check next tile
+			blt gwpaBbr4				;if empty, continue to recursion
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, stepIndex, pc2
+			jsr pc, isOnBtm				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on bottom side
+			beq gwpaBbr1				;if it is, check next tile
+			
+			jsr pc, isOnRght			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if right move tile is on right side
+			beq gwpaBbr1				;if it is, check next tile
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+stepIndex, pc2
+			add #22, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if right LEAP tile is empty or not
+			bne gwpaBbr1				;if it's not, check next tile
+			
+		gwpaBbr4:
+			;YAY RECURSION MUCH FUN YAY
+			sub 20(sp), 2(sp)			;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2
+			jsr pc, gwpaPrep
+			jmp gwpaBbr1
+			
+			
+			
+		
+		
+		
+		
+				
+gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -, pc2
+			mov #200, 6(sp) 			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, -2 , - , -, pc2 
+		gwpaWbr1:		
+			sub #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
+			cmp 6(sp), #20
+			bge gwpaWbr2				;if reached end of board, stops
+				rts pc
+		gwpaWbr2:
+			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
+			cmp @2(sp), #White			;checks if tile has white
+			bne gwpaWbr1				;if not, check next tile
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
+			jsr pc, isOnLeft			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on left border
+			beq gwpaRW					;if it is, check right move
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+index, pc2
+			sub #22, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			beq gwpaRW 					;if contains white, check right move 
+			blt gwpaWbr3				;if empty, continue to recursion
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, stepIndex, pc2
+			jsr pc, isOnTop				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on top side
+			beq gwpaRW					;if it is, check right move
+			
+			jsr pc, isOnLeft			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on left side
+			beq gwpaRW					;if it is, check right move
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+stepIndex, pc2
+			sub #22, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if left LEAP tile is empty or not
+			bne gwpaRW					;if it's not, check right move
+		
+		;the recursion part:
+		gwpaWbr3:
+			;YAY RECURSION MUCH FUN YAY
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2
+			jsr pc, gwpaPrep
+			
+		gwpaRW:
+			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			jsr pc, isOnRght			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, index, pc2
+			cmp 4(sp), #1				;checks if on Right border
+			beq gwpaWbr1				;if it is, check next tile
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+index, pc2
+			sub #16, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, #Board+stepIndex, pc2
+			cmp @2(sp), #1				;check who's on move tile
+			beq gwpaWbr1 				;if contains white, check next tile
+			blt gwpaWbr4				;if empty, continue to recursion
+			
+			sub 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result*, stepIndex, pc2
+			jsr pc, isOnTop				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result2*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if left move tile is on top side
+			beq gwpaWbr1				;if it is, check next tile
+			
+			jsr pc, isOnRght			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, stepIndex, pc2
+			cmp 4(sp), #1				;checks if right move tile is on right side
+			beq gwpaWbr1				;if it is, check next tile
+			
+			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+stepIndex, pc2
+			sub #16, 2(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, *result3*, #Board+LEAPIndex, pc2
+			cmp @2(sp), #Empty			;checks if right LEAP tile is empty or not
+			bne gwpaWbr1				;if it's not, check next tile
+			
+		gwpaWbr4:
+			;YAY RECURSION MUCH FUN YAY
+			sub 20(sp), 2(sp)			;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2
+			jsr pc, gwpaPrep
+			jmp gwpaWbr1		
+		
+		
+		
+		
+
+			
+cntMoves:	
+				;| STACK:   -   , #Board, Player, pc
+				;input: empty space for output  	- in stack
+				;		Player						- in stack
+				;		board address				- in stack
+				;output: number of possible moves 	- in empty space in stack
+			mov r0, -(sp)							;preserving r0, now used as an index for game tiles
+			mov 6(sp), r0
+			mov r0, BoardB
+			mov r0, BoardE
+			mov r0, BordLRo
+			add #176, BoardE
+			add #160, BordLRo
+			mov r1, -(sp)							;preserving r1, now used to count the possible moves
+			clr r1
+			mov r2, -(sp)							;preserving r2, now used for calculations
+			mov r3, -(sp)							;preserving r3, now used for calculations
+			mov r4, -(sp)							;preserving r4, now used to hold player's turn
+			mov 14(sp) , r4
+			
+			add #156, r0							;starts to go throught indexes from the end to beginning
+			cmp #Black, r4			
+			beq loopB
+			
+				sub #136, r0						;starts at the second last row, because there is no use checking for the last row
+				br loopW							;checks whose turn it is
+			
+		;a loop for counting possible moves in case player is Black
+			
+	loopB:
+			cmp (r0), #Black
+			bne nextB								;if not Black, proceed to nextB tile
+			
+	;Black left border check:			
+
+				mov r0, r3							;for r2r3 we check if r3(mod 20) == 0, which means we're at the left border
+				sxt r2					
+				div #20, r2
+				cmp r3, #EdgeL						;if on left border - 
+				beq tileRB							; - proceed to check right move tile (skip the right border check)			
+			
+	;B left occupation check:
+		
+			mov r0, r3
+			add #SkipC, r3
+			cmp (r3), #White
+			bgt borderRB 							;if left move tile has Black, proceed to check right border
+			beq leapLB								;if left move tile has White, proceed to check left leap
+					
+				inc r1								;else increase numOfSteps by 1
+				br borderRB							;proceed to check the right border 
+
+		;checks if player can leap (eat) the playpiece on its left
+			
+	leapLB:	
+			cmp r3, BordLRo							;if White is at last row -
+			bge borderRB							; - proceed to check right border
+			
+				tst r3
+				sxt r2	
+				div #20, r2
+				cmp r3, #EdgeL						;if White is at left border - 
+				beq borderRB						; - proceed to check right border
+				
+					mov r0, r3					
+					add #SkipC, r3
+					add #SkipC, r3	
+					cmp (r3), #Empty				;if left leap tile is occupied - 
+					bne borderRB					; - proceed to check right border
+					
+						inc r1						;else increase numOfSteps by 1
+						br borderRB					;proceed to check the right border
+					
+		;Black right border check:
+		
+	borderRB:	
+			mov r0, r3
+			sxt r2
+			div #20, r2
+			cmp r3, #EdgeR							;if on right border - 
+			beq nextB								;proceed to nextB tile
+			
+		;the label signifies a situation where we want to check if Black player can proceed to the right diagonal, when we know he is not on the right border
+			
+	tileRB:
+			mov r0, r3
+			add #SkipF, r3
+			cmp (r3), #White			
+			bgt nextB								;if right move tile has Black, proceed to nextB tile
+			
+				beq leapRB							;if right move tile has White, proceed to check right leap 
+				
+					inc r1							;else increase numOfSteps by 1
+					br nextB						; proceed to nextB tile
+			
+		;checks if player can leap (eat) the playpiece on its right
+			
+	leapRB:	
+			cmp r3, BordLRo							;if White is at last row - 			
+			bge nextB								; - proceed to nextB tile
+			
+				tst r3
+				sxt r2
+				div #20, r2
+				cmp r3, #EdgeR						;if White is at right border - 
+				beq nextB							;proceed to nextB tile
+				
+					mov r0, r3
+					add #SkipF, r3					
+					add #SkipF, r3					
+					cmp (r3), #Empty				;if right leap tile is occupied - 
+					bne nextB						; - proceed to nextB tile
+					
+						inc r1						;else increase numOfSteps by 1
+						br nextB
+
+		;checks next tile for moves.
+						
+	nextB:
+			sub #2, r0								;going from end to start, each tile a word (so *2* bytes)
+			cmp r0, BoardB
+			bge loopB
+				
+		;unfold routine and Empty the stack
+		
+				mov r1, 20(sp)
+				mov (sp)+, r4
+				mov (sp)+, r3
+				mov (sp)+, r2
+				mov (sp)+, r1
+				mov (sp)+, r0		
+				rts pc
+
+		;a loop for counting possible moves in case player is White			
+			
+	loopW:		
+			cmp (r0), r4					;checks wether current tile has a White playpiece
+			bne nextW						;if not checks next tile
+			
+				mov r0, r3						;
+				sxt r2							;
+				div #20, r2						;finds the reminders of the index, each even reminder between 0 - 20 (excluding) indicates a different horizontal location
+			
+				cmp r3, #EdgeL
+				beq tileRW					;if it's right by the left ledge, move is illegal, there's no need to check if next to right ledge, since it is 
+											;obviously by the left ledge.
+			
+			mov r0, r3					
+			sub #SkipF, r3				
+			
+			cmp (r3), #White				;if space has a White playpiece, it cannot jump there
+			beq borderRW
+				cmp (r3), #Black			;if space has a Black playpiece try and initiate eat
+				beq leapLW					
+					inc r1					;otherwise space is Empty so a move is possible
+					br borderRW
+	
+		;checks if player can leap (eat) the playpiece on its left
+	
+	leapLW:
+			tst r3
+			sxt r2						
+			div #20, r2						;finds the reminders of the index, to determine if close to the left
+			
+			cmp r3, #EdgeL
+			beq borderRW					;if it's right by the left ledge, move is illegal
+
+				mov r0,r3					;otherwise, check if close to ledge has destroyed r2, we have to recreate the checked index and find now the third 
+				sub #SkipF, r3				;diagonal tile away from checked tile
+				sub #SkipF, r3				;
+				cmp r3, BoardB
+				blt borderRW				;if index is negative that must mean eating would get the piece out of bounds.
+				
+					cmp (r3), #Empty		;if space is Empty count as eat
+					bne borderRW
+					inc r1					;eating is possible. now to check a move to the right
+					br borderRW
+			
+		;checks if playpiece is on the right border (check if can jump to the right)
+		
+	borderRW:
+			mov r0, r3						;
+			sxt r2							;
+			div #20, r2						;finds the reminders of the index, each even reminder between 0 - 20 (excluding) indicates a different horizontal location
+						
+			cmp r3, #EdgeR
+			beq nextW						;if it's right by the right ledge, move is illegal, check the next tile
+			
+		;the label signifies a situation where we want to check if Black player can proceed to the right diagonal, when we know he is not on the right border
+			
+			
+	tileRW:
+			mov r0, r3						;
+			sub #SkipC, r3					;
+			cmp (r3), #White				;if space has a White playpiece, it cannot jump there
+			beq nextW
+				cmp (r3), #Black			;if space has a Black playpiece try and initiate eat
+				beq leapRW
+				inc r1						;otherwise space is Empty so a move is possible
+				br nextW
+		
+		;checks if player can leap (eat) the playpiece on its left
+	
+	leapRW:	
+			tst r3
+			sxt r2						
+			div #20, r2						;finds the reminders of the index, to determine if close to the right
+			
+			cmp r3, #EdgeR
+			beq nextW						;if it's right by the right ledge, move is illegal
+			
+				mov r0,r3					;otherwise, check if close to ledge has destroyed r2, we have to recreate the checked index and find now the third 
+				sub #SkipC, r3				;diagonal tile away from checked tile
+				sub #SkipC, r3				;
+				cmp r3, BoardB				;
+				blt nextW					;if index is negative, that must mean eating would get the piece out of bounds.
+			
+				cmp (r3), #Empty			;if space is Empty count as eat
+				bne nextW
+					inc r1					;eating is possible. now to check the nextW tile
+					br nextW				;checkes nextW tile
+
+		;check next tile index
+			
+	nextW:	
+			add #2, r0						;check nextW tile
+			cmp r0, BoardE					;if index is 176 board has been scanned top to bottom -> halt
+			ble loopW
+
+		;unfold routine and Empty the stack
+		
+				mov r1, 20(sp)
+				mov (sp)+, r4
+				mov (sp)+, r3
+				mov (sp)+, r2
+				mov (sp)+, r1
+				mov (sp)+, r0			
+				rts pc
+		
+BoardB:		.blkw 1						;gonna hold the addresses of the end of the game board and beginning
+BoardE:		.blkw 1						;
+BordLRo:	.blkw 1						;address of the first tile in the last row of the board
+
+
+
+
+
+
+
+;~~~~
+
+
+
+
+
+
+		
+
+			
+
+
+isOnLeft:	;checks whether a certain index is on the first column of the board - returns 1 if yes, 0 if not
+			;										LR - pc
+			;										the index - in stack (on top of the stack)
+			;										output - in stack (below the index)
+			;														| STACK: ..., - (place_for_output), index, pc
+			clr 6(sp)					;set result to 0 by default	| STACK: ..., 0, index, - , pc
+			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
+			mov r1, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0, ^r1
+			mov 10(sp), r1				;							| STACK: ..., 0, index, - , pc, ^r0, ^r1
+			sxt r0
+			div #20, r0
+			cmp r1, #EdgeL
+			bne iolNext
+				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
+		iolNext:
+			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
+			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
+			rts pc
+			
+			
+isOnRght:	;checks whether a certain index is on the last column of the board - returns 1 if yes, 0 if not
+			;										LR - pc
+			;										the index - in stack (on top of the stack)
+			;										output - in stack (below the index)
+			;														| STACK: ..., - , index, - , pc
+			clr 6(sp)					;set result to 0 by default	| STACK: ..., 0, index, - , pc
+			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
+			mov r1, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0, ^r1
+			mov 10(sp), r1				;							| STACK: ..., 0, index, - , pc, ^r0, ^r1
+			sxt r0
+			div #20, r0
+			cmp r1, #EdgeR
+			bne iorNext
+				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
+		iorNext:
+			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
+			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
+			rts pc
+			
+			
+			
+isOnTop:	;checks whether a certain index is on the first row of the board - returns 1 if yes, 0 if not
+			;										LR - pc
+			;										the index - in stack (on top of the stack)
+			;										output - in stack (below the index)
+			;														| STACK: ..., - , index, - , pc
+			clr 6(sp)					;set result to 0 by default	| STACK: ..., 0, index, - , pc
+			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
+			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
+			cmp r0, #20
+			bge iotNext
+				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
+		iotNext:
+			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
+			rts pc
+			
+
+isOnBtm:	;checks whether a certain index is on the last row of the board - returns 1 if yes, 0 if not
+			;										LR - pc
+			;										the index - in stack (on top of the stack)
+			;										output - in stack (below the index)
+			;														| STACK: ..., - , index, , - , pc
+			clr 6(sp)					;set result to 0 by default	| STACK: ..., 0, index, - , pc
+			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
+			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
+			cmp r0, #156
+			ble iobNext
+				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
+		iobNext:
+			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
+			rts pc
+			
+
+.=torg+21000
+
+Board:
+.word 0,1,0,0,0,0,0,0
+.word 0,0,0,0,0,0,0,0
+.word 0,2,0,0,0,0,0,0
+.word 0,0,1,0,0,0,0,0
+.word 0,2,0,0,0,0,0,0
+.word 2,0,2,0,0,0,0,0
+.word 0,1,0,0,0,0,0,0
+.word 0,0,0,0,0,0,0,0
+Player:.word 2
+Steps:.word 3
+
+;output
+;21
+SrcPos: .blkw 1
+;43
+DstPos: .blkw 1
+;3
+WinParam: .blkw 1									
+										
+
+								
