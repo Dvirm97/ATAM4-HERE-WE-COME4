@@ -656,9 +656,8 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaBbr1:		
 			add #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #160
-			blt gwpaBbr2				;if reached end of board, stops
+			blt .+2					;if reached end of board, stops
 				rts pc
-		gwpaBbr2:
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
 			cmp @2(sp), #Black			;checks if tile has black
@@ -739,9 +738,8 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaWbr1:		
 			sub #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #20
-			bge gwpaWbr2				;if reached end of board, stops
+			bge .+2					;if reached end of board, stops
 				rts pc
-		gwpaWbr2:
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
 			cmp @2(sp), #White			;checks if tile has white
