@@ -36,8 +36,8 @@ Minus = 55
 
 . = torg + 3000
 main:		
-			mov pc, sp	;init stack
-			tst -(sp) 	;init stack
+			mov pc, sp				;init stack
+			tst -(sp) 				;init stack
 			
 			
 			
@@ -51,22 +51,29 @@ main:
 			mov #input, r1
 			add #62, r1				;adress of end of input			
 			tst (sp)+
-			mov #101, @#TKS	
 		;Before any game has begun:
 		stage1:
+			mov #0, @#LCS
+			mov #0, gameStat
+			mov #0, enter?
+			mov #0, moved?
 			mov #newRow, (sp)
 			jsr pc, print
-			cmp enter?, #1			;->
-			bne .-6					;<-
+			mov #101, @#TKS	
+			wait					;<-
+			cmp enter?, #1			
+			bne .-8					;->
 			mov #0, enter?
 			mov #100, @#TKS	
 			jsr pc, readCmd
 			jsr pc, clrInput
 			cmp gameStat, #1
 			bne stage1
-		
+		newTurn:
 			jsr pc, prBoard
-			cmp Player ,#1
+			mov #0, clockCounter
+			mov #0, timeUp
+			cmp Player, #1
 			bne chkB
 				mov timeW, currPTime
 				cmp roleW, #1
@@ -79,25 +86,29 @@ main:
 			beq waitH
 			
 		waitC:
+			mov #0, clockCounter
 			mov #0, timeUp
 			mov #101, @#TKS
 			mov #newRow, (sp)
 			jsr pc, print
-			cmp enter?, #1				;->
-			bne .-6						;<-
+			wait						;<-
+			cmp enter?, #1				
+			bne .-8						;->
 			mov #0, enter?
 			jsr pc, readCmd
 			jsr pc, clrInput
 			
 		waitH:
-			mov #0, timeUp
 			mov #101, @#TKS
 			mov #newRow, (sp)
 			jsr pc, print
-			cmp enter?, #1				;->
-			bne .-6						;<-
+			wait						;<-	
+			cmp enter?, #1			
+			bne .-8						;->
 			mov #100, @#TKS
 			mov #0, enter?
+			cmp timeUp, #1
+			beq endGame
 			jsr pc, readCmd
 			jsr pc, clrInput
 			cmp gameStat, #1
@@ -105,15 +116,45 @@ main:
 			cmp moved?, #1
 			bne waitH
 			mov #0, moved?
-			neg Player
-			add #3, Player
-			br waitH					;NOT REALLY!! HAS TO CHECK WHETHER NEXT PLAYER IS HUMAN TOO
+			br newTurn
+			
+		endGame:
+			mov #0, @#LCS
+			mov #0, gameStat
+			mov #15, (sp)
+			jsr pc, printChr
+			mov #12, (sp)
+			jsr pc, printChr
+			jsr pc, printChr
+			cmp Player, #1
+			bne endgB
+			mov #STstopW2, (sp)
+			jsr pc, print
+			mov #40, (sp)
+			jsr pc, printChr
+			mov #Computer, (sp)
+			cmp roleW, #0
+			beq endgNext
+			mov #Human, (sp)
+			br endgNext
+		endgB:
+			mov #STstopB2, (sp)
+			jsr pc, print
+			mov #40, (sp)
+			jsr pc, printChr
+			mov #Computer, (sp)
+			cmp roleB, #0
+			beq endgNext
+			mov #Human, (sp)
+			;br endgNext
+		endgNext:
+			jsr pc, print
+			mov #endMsg, (sp)
+			jsr pc, print
+			jmp stage1
 			
 			
 			
-			br stage1	
-			tst (sp)+
-			halt
 
 
 
@@ -326,11 +367,16 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 		exe1exe:
 			movb #0, (r2)					;puts an end in seconds, for print
 			mov r1, TtempB
-			tst (sp)+						;r1 | r0 | pc | 0 | ...
+			tst (sp)+						;r2 | r1 | r0 | pc | 0 | ...
+			
 			mov RtempW, roleW
-			mov TtempW, timeW
+			mov TtempW, r1
+			mul rate, r1
+			mov r1, timeW
 			mov RtempB, roleB
-			mov TtempB, timeB
+			mov TtempB, r1
+			mul rate, r1
+			mov r1, timeB
 			jsr pc, exeStart
 			mov (sp)+, r2					;r1 | r0 | pc | 0 | ...
 			mov (sp)+, r1					;r0 | pc | 0 | ...
@@ -425,8 +471,10 @@ readCmd:
 			
 		rcmd3:
 			jsr pc, moveChk
+			mov (sp), moved?
 			cmp (sp), #1
 			beq rcmdX
+			;br rcmdErr
 			
 		rcmdErr:
 			mov #cntExe1, -(sp)				;<cantExecute1> | 0 | pc | ...
@@ -862,6 +910,7 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				asr r5
 				add #Board, r5
 				mov #Empty, (r5)
+				
 				br finish
 				
 	illegal:		
@@ -873,7 +922,6 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov (sp)+, r5							; | r4 | r2 | pc | 0 |	
 				mov (sp)+, r4							; | r2 | pc | 0 |	
 				mov (sp)+, r2							; | pc | 0 |
-
 				rts pc
 				
 						
@@ -907,7 +955,6 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov (sp)+, r5							; | r4 | r2 | pc | 1 |	
 				mov (sp)+, r4							; | r2 | pc | 1 |	
 				mov (sp)+, r2							; | pc | 1 |
-
 				rts pc
 
 							
@@ -978,6 +1025,7 @@ clock:			inc clockCounter
 				ble .+4
 					rti
 				mov #1, timeUp
+				mov #1, enter?
 				rti
 				
 				
@@ -1859,9 +1907,8 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaBbr1:		
 			add #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #160
-			blt gwpaBbr2				;if reached end of board, stops
+			blt .+2						;if reached end of board, stops
 				rts pc
-		gwpaBbr2:
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
 			cmp @2(sp), #Black			;checks if tile has black
@@ -1942,9 +1989,8 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaWbr1:		
 			sub #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #20
-			bge gwpaWbr2				;if reached end of board, stops
+			bge .+2						;if reached end of board, stops
 				rts pc
-		gwpaWbr2:
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
 			cmp @2(sp), #White			;checks if tile has white
@@ -2445,6 +2491,8 @@ cntExe2: .ascii<".\r\n\0>
 boardLO: .ascii<Board layout: \r\n\r\n\0>
 .even
 curP_msg: .ascii<Current player: \0>
+.even
+endMsg: .ascii< is out of time. Game over.\r\n\0>
 
 . = torg + 30000
 .word 0
