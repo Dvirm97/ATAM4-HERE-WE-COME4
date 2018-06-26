@@ -30,13 +30,14 @@ Minus = 55
 . = torg + 60
 .word receive
 .word 200
+. = torg + 100
+.word clock
+.word 300
 
 . = torg + 3000
 main:		
 			mov pc, sp	;init stack
 			tst -(sp) 	;init stack
-			
-			;mov #100, @#LCS
 			
 			
 			
@@ -44,41 +45,75 @@ main:
 		;print opening message:	
 			mov #openMsg, -(sp)
 			jsr pc, print
-			tst (sp)+
-		;print new row:	
-			mov #newRow, -(sp)
-			jsr pc, print
-			mov #44, (sp)				;'$'
-			jsr pc, printChr			
-			tst (sp)+
+			tst (sp)
 			
 			mov #input, r0
 			mov #input, r1
-			add #124, r1				;adress of end of input
-			mov #101, @#TKS				
-			bis #1, @#TKS				;->
-			wait
-			br .-10 					;<-
+			add #62, r1				;adress of end of input			
+			tst (sp)+
+			mov #101, @#TKS	
+		;Before any game has begun:
+		stage1:
+			mov #newRow, (sp)
+			jsr pc, print
+			cmp enter?, #1			;->
+			bne .-6					;<-
+			mov #0, enter?
+			mov #100, @#TKS	
+			jsr pc, readCmd
+			jsr pc, clrInput
+			cmp gameStat, #1
+			bne stage1
+		
+			jsr pc, prBoard
+			cmp Player ,#1
+			bne chkB
+				mov timeW, currPTime
+				cmp roleW, #1
+				bne waitC
+				beq waitH
+		chkB:
+			mov timeB, currPTime
+			cmp roleB, #1
+			bne waitC
+			beq waitH
+			
+		waitC:
+			mov #0, timeUp
+			mov #101, @#TKS
+			mov #newRow, (sp)
+			jsr pc, print
+			cmp enter?, #1				;->
+			bne .-6						;<-
+			mov #0, enter?
+			jsr pc, readCmd
+			jsr pc, clrInput
+			
+		waitH:
+			mov #0, timeUp
+			mov #101, @#TKS
+			mov #newRow, (sp)
+			jsr pc, print
+			cmp enter?, #1				;->
+			bne .-6						;<-
+			mov #100, @#TKS
+			mov #0, enter?
+			jsr pc, readCmd
+			jsr pc, clrInput
+			cmp gameStat, #1
+			bne stage1
+			cmp moved?, #1
+			bne waitH
+			mov #0, moved?
+			neg Player
+			add #3, Player
+			br waitH					;NOT REALLY!! HAS TO CHECK WHETHER NEXT PLAYER IS HUMAN TOO
+			
+			
+			
+			br stage1	
+			tst (sp)+
 			halt
-openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!\0>
-.even 
-newRow: .ascii<\r\n\0>
-.even
-startMsg: .ascii<Starting a new game\0>
-.even			
-cntExe1: .ascii<Cannot execute "\0>
-.even
-cntExe2: .ascii<".\0>
-.even
-input: .blkw 31
-	   .byte 0  		;up to 50(decimal) chars	
-.even
-
-roleW: .blkw 1
-timeW: .blkw 1
-roleB: .blkw 1
-timeB: .blkw 1
-gameStat: .blkw 1
 
 
 
@@ -92,15 +127,13 @@ receive: 	;receives input~
 			
 			cmp (sp), #15				;is enter?
 			bne r_check2
-				mov #newRow, (sp)		;<newRow>
-				jsr pc, print
-				jsr pc, readCmd
-				jsr pc, clrInput
-				mov #input, r0
-				mov #newRow, (sp)		;<newRow>
-				jsr pc, print
-				mov #44, (sp)			;'$'
+				mov #1, enter?
+				mov #15, (sp)			;'\r'
 				jsr pc, printChr
+				mov #12, (sp)			;'\n'
+				jsr pc, printChr
+				jsr pc, printChr		;go down *2* rows
+				mov #input, r0
 				br r_end
 				
 	r_check2:
@@ -121,6 +154,7 @@ receive: 	;receives input~
 			movb @#TKB, (r0)+			;<-
 			jsr pc, printChr
 	r_end:	tst (sp)+					;~empty~
+			bis #1, @#TKS
 			rti
 
 print:	;Receives in stack (top to bottom):			
@@ -157,7 +191,7 @@ clrInput:	;sets
 			mov r0, -(sp)
 			mov #input, r0
 			mov r1, -(sp)
-			mov #31, r1
+			mov #62, r1					;62 (50 decimal) is maximum input length
 			clrb (r0)+ 					;maybe put space instead?
 			sob r1, .-2
 			mov (sp)+, r1
@@ -167,11 +201,12 @@ clrInput:	;sets
 startChk:	;receives empty place in stack, to flag whether executed or not
 			;r0 used for iterating over input
 			;r1 used for calculating time
-			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether ex'd or not
+			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether exe'd or not
 			mov r0, -(sp)				;r0 | pc | 0 | ...
 			mov #input, r0
 			mov r1, -(sp)				;r1 | r0 | pc | 0 | ...
 			clr r1
+			mov r2, -(sp)				;r2 | r1 | r0 | pc | 0 | ...
 			
 			tstb -(r0)					
 			tstb (r0)+					;<-
@@ -214,13 +249,15 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			cmpb (r0), #40 				;' '
 			beq .-6						;->
 			
-			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
-			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
-		exe1num1:	
+			clr -(sp)					; *0* | r1 | r0 | pc | 0 | ...
+			mov #secondsW, r2
+		exe1num1:
+			movb (r0), (r2)+
 			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ...
 			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
 			cmp (sp), #-1
 			bne sChk3
+				clrb -(r2)
 				tst (sp)+					;r1 | r0 | pc | 0 | ...
 				br sChkX			
 		sChk3:
@@ -230,6 +267,7 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			cmpb (r0), #40				;' '
 			bne exe1num1
 			mov r1, TtempW
+			movb #0, (r2) 				;puts an end in seconds, for print
 			tst (sp)+					;r1 | r0 | pc | 0 | ...
 			
 			tstb (r0)+					;<-
@@ -258,11 +296,14 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			clr r1
 			tst -(sp)					; - | r1 | r0 | pc | 0 | ...
 			clr (sp)					;0 | r1 | r0 | pc | 0 | ...
+			mov #secondsB, r2
 		exe1num2:	
+			movb (r0), (r2)+
 			movb (r0)+, (sp)			;char | r1 | r0 | pc | 0 | ... 
 			jsr pc, trnToNum			;*num* | r1 | r0 | pc | 0 | ...
 			cmp (sp), #-1
 			bne sChk6
+				clrb -(r2)
 				tst (sp)+					;r1 | r0 | pc | 0 | ...
 				br sChkX			
 		sChk6:
@@ -274,8 +315,16 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			cmpb (r0), #40				;' '
 			beq exe1exe
 			br exe1num2
+			
+		sChkX:
+			mov (sp)+, r2					;r1 | r0 | pc | 0 | ...
+			mov (sp)+, r1					;r0 | pc | 0 | ...
+			mov (sp)+, r0					;pc | 0 | ...
+			;mov #0, 2(sp)
+			rts pc
 					
 		exe1exe:
+			movb #0, (r2)					;puts an end in seconds, for print
 			mov r1, TtempB
 			tst (sp)+						;r1 | r0 | pc | 0 | ...
 			mov RtempW, roleW
@@ -283,16 +332,11 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			mov RtempB, roleB
 			mov TtempB, timeB
 			jsr pc, exeStart
-			mov (sp)+, r1
-			mov (sp)+, r0
-			mov #1, 2(sp)
-			rts pc
-			
-		sChkX:
+			mov (sp)+, r2					;r1 | r0 | pc | 0 | ...
 			mov (sp)+, r1					;r0 | pc | 0 | ...
 			mov (sp)+, r0					;pc | 0 | ...
-			;mov #0, 2(sp)
-			rts pc
+			mov #1, 2(sp)
+			rts pc		
 RtempW: .blkw 1
 TtempW: .blkw 1
 RtempB: .blkw 1
@@ -300,8 +344,40 @@ TtempB: .blkw 1
 
 			
 exeStart:
+			mov #100, @#LCS
+			mov #1, Player
+			mov #1, Steps
 			mov #1, gameStat
 			mov #startMsg, -(sp)
+			jsr pc, print
+			mov #startM_W, (sp)
+			jsr pc, print
+			mov #Computer, (sp)
+			cmp roleW, #0
+			beq exsNext1
+			mov #Human, (sp)
+		exsNext1:
+			jsr pc, print
+			mov #with, (sp)
+			jsr pc, print
+			mov #secondsW, (sp)
+			jsr pc, print
+			mov #startM2, (sp)
+			jsr pc, print
+			
+			mov #startM_B, (sp)
+			jsr pc, print
+			mov #Computer, (sp)
+			cmp roleB, #0
+			beq exsNext2
+			mov #Human, (sp)
+		exsNext2:
+			jsr pc, print
+			mov #with, (sp)
+			jsr pc, print
+			mov #secondsB, (sp)
+			jsr pc, print
+			mov #startM2, (sp)
 			jsr pc, print
 			tst (sp)+
 			rts pc
@@ -358,7 +434,7 @@ readCmd:
 			mov #input, (sp)				;<input> | 0 | pc | ...
 			jsr pc, print
 			mov #cntExe2, (sp)				;<cantExecute2> | 0 | pc | ...
-			jsr pc, print	
+			jsr pc, print			
 			tst (sp)+
 		rcmdX:
 			tst (sp)+
@@ -391,13 +467,107 @@ stopChk:
 		br stpChkX
 		
 		
-exeStop: ;stops.
-		mov #stopMsg, -(sp)
-		jsr pc, print
-		tst (sp)+
-		rts pc
-stopMsg: .ascii<STOP!>
-.even
+exeStop:		;stops shit.	
+				mov r0, -(sp)							; | r0 | pc |... 
+				mov r1, -(sp)							; | r1 | r0 | pc |...
+				mov r4, -(sp)							; | r4 | r1 | r0 | pc |...
+				mov #Enter1, -(sp)						; | char | r4 | r1 | r0 | pc |
+				jsr pc, printChr
+				mov #Enter2, (sp)						; | char | r4 | r1 | r0 | pc |
+				jsr pc, printChr
+				mov #STstop1, (sp)						; | text address | r4 | r1 | r0 | pc |
+				jsr pc, print
+				
+				cmp #White, Player
+				beq .+14
+					mov #STstopB1, (sp)
+					jsr pc, print
+					br .+12
+				mov #STstopW1, (sp)
+				jsr pc, print
+				
+				mov #STstop2, (sp)
+				jsr pc, print
+				mov #Board, (sp)						; | #Board | r4 | r1 | r0 | pc |
+				mov Player, -(sp)						; | Player | #Board | r4 | r1 | r0 | pc |
+				jsr pc, calcWP
+				tst (sp)+	 							; | #Board | r4 | r1 | r0 | pc |
+				tst (sp)+								; | r4 | r1 | r0 | pc |
+				mov r4, r1								; r4 holds the result from calcWP
+				mov r4, -(sp)							; | WP | r4 | r1 | r0 | pc |
+				mov #1, r4								; r4 now holds how many digits are in the WP result
+				
+				tst r1									
+				bpl .+16
+					mov #Minus, -(sp)
+					jsr pc, printChr
+					tst (sp)+
+					neg r1
+				
+				cmp r1, #10
+				blt .+26
+					tst r1
+					sxt r0
+					div #10, r0
+					inc r4
+					add #Ascii0, r1
+					mov r1, -(sp)						; | | | | | | <- WP digits | WP | r4 | r1 | r0 | pc |
+					mov r0, r1
+					br .-30
+				add #Ascii0, r1
+				mov r1, -(sp)							; | last digit | | | | | | <- WP digits | WP | r4 | r1 | r0 | pc |
+				jsr pc, printChr
+				tst(sp)+
+				sob r4, .-6
+				
+				; | WP | r4 | r1 | r0 | pc |
+				
+				mov #Enter1, -(sp)
+				jsr pc, printChr
+				mov #Enter2, (sp)
+				jsr pc, printChr			
+				mov #Enter1, (sp)
+				jsr pc, printChr
+				mov #Enter2, (sp)
+				jsr pc, printChr
+				mov Player, r0
+				tst (sp)+
+				tst (sp)								;check if WP is positive
+				beq printTie
+				bpl .+10
+					neg r0
+					add #3, r0
+				cmp r0, #Black
+				beq .+14
+					mov #STstopW2, (sp)
+					jsr pc, print
+					br .+12
+				mov #STstopB2, (sp)
+				jsr pc, print
+				
+				mov #STstop3, (sp)
+				jsr pc, print
+				
+				tst (sp)+								; | r4 | r1 | r0 | pc |
+				mov (sp)+, r4							; | r1 | r0 | pc |
+				mov (sp)+, r1							; | r0 | pc |
+				mov (sp)+, r0							; | pc |
+				mov #0, gameStat
+				
+				rts pc
+				
+	printTie:	mov #STtie, (sp)
+				jsr pc, print
+				
+				tst (sp)+								; | r4 | r1 | r0 | pc |
+				mov (sp)+, r4							; | r1 | r0 | pc |
+				mov (sp)+, r1							; | r0 | pc |
+				mov (sp)+, r0							; | pc |
+				mov #0, gameStat
+				
+				rts pc
+				
+				
 		
 timeChk: 
 		mov #0, 2(sp)
@@ -425,13 +595,37 @@ timeChk:
 		jsr pc, exeTime
 		br tChkX
 		
-exeTime: ;tells time.
-		mov #timeMsg, -(sp)
-		jsr pc, print
-		tst (sp)+
-		rts pc
-timeMsg: .ascii<TIME!>
-.even
+exeTime:		mov r1, -(sp)							; | r1 | pc |
+				mov #STtime1, -(sp)						; | string | r1 | pc |
+				jsr pc, print								
+				cmp #1,  timeUp
+				beq noTime
+				
+					mov currPTime, r1
+					sub clockCounter, r1
+					jsr pc, printTime
+					
+					
+	string2:		mov #STtime2, (sp)						; | string | r1 | pc |
+					jsr pc, print
+					mov #Enter1, (sp)
+					jsr pc, printChr
+					mov #Enter2, (sp)
+					jsr pc, printChr
+					tst (sp)+								; | r1 | pc |
+					mov (sp)+, r1							; | pc |
+					
+					rts	pc		
+
+					
+	noTime:		mov #STtime3, (sp)
+				mov #3, -(sp)
+				jsr pc, print
+				tst (sp)+
+				br string2
+				
+				
+				
 			
 moveChk: 
 		mov #0, 2(sp)				;pc | 0
@@ -465,7 +659,7 @@ moveChk:
 		asl r1						;multiply by 8, and then by 2:
 		asl r1
 		asl r1
-		asl r1						;again? ask uriya
+		asl r1						;by 2
 		add r1, tempSrc
 		
 		clr -(sp)					; - | r1 | r0 | pc | 0 |...
@@ -476,7 +670,7 @@ moveChk:
 		beq mChkX
 		cmp r1, #10					;means the digit is 8 or 9, which is invalid
 		bge mChkX
-		asl r1						;ask uriya
+		asl r1						;by 2
 		add r1, tempSrc
 		
 		cmpb (r0), #40				;' '
@@ -529,21 +723,347 @@ moveChk:
 		cmp (sp), #1
 		bne .+10 					;->
 		mov #1, 10(sp)
-		tst (sp)+					;<-
-									;r1 | r0 | pc | 0 |...
-		br mChkX
+		tst (sp)+					;<- ;r1 | r0 | pc | 0 |...
+		br mChkX					
 tempSrc: .blkw 1
 tempDst: .blkw 1
 
 
 
-exeMove: ;plays move.
-		mov #moveMsg, -(sp)
-		jsr pc, print
-		tst (sp)+
-		rts pc
-moveMsg: .ascii<MOVE!>	
-.even		
+exeMove:		mov r2, -(sp)							; | r2 | pc | - |
+				mov r4, -(sp)							; | r4 | r2 | pc | - |
+				mov r5, -(sp)							; | r5 | r4 | r2 | pc | - |
+				mov clockCounter, 10(sp)				; | r5 | r4 | r2 | pc | time |
+				mov Player, r2
+				dec r2
+				asl r2
+				asl r2
+				tst roleW(r2)
+				beq ilegal
+				
+				; if player is human continue with interrupt function
+				tst SrcPos
+				bmi ilegal
+				cmp SrcPos, #176
+				bgt ilegal
+				tst DstPos
+				bmi ilegal
+				cmp SrcPos, #176 
+				bgt ilegal
+				
+				mov SrcPos, r4
+				add #Board, r4
+				cmp (r4), Player
+				bne illegal
+				
+				cmp SrcPos, DstPos						;check if the player which doesnt make a move, has no moves
+				bne .+32
+					tst -(sp)							; | - | r5 | r4 | r2 | pc | time |
+					mov #Board, -(sp)					; | #Board | - | r5 | r4 | r2 | pc | time |
+					mov Player, -(sp)					; | Player | #Board | - | r5 | r4 | r2 | pc | time |
+					jsr pc, cntMoves
+					tst (sp)+							; | #Board | Num_moves | r5 | r4 | r2 | pc | time |
+					tst (sp)+							; | Num_moves | r5 | r4 | r2 | pc | time |
+					tst (sp)+							; | r5 | r4 | r2 | pc | time |
+					beq finish
+						br illegal
+				
+				mov DstPos, r4
+				add #Board, r4	
+				cmp (r4), #Empty
+				bne illegal
+			
+				
+
+
+				
+				mov SrcPos, r5							;find placement on the X axis of board
+				clr r4									;for later usage
+				div #20, r4								;
+				
+				mov SrcPos, r2
+				sub DstPos, r2
+				
+				cmp Player, #Black
+				beq BChkLegal
+
+	;else
+	;WChkLegal:		
+				tst r2
+				bmi illegal
+				
+				cmp r2, #SkipF
+				bgt WChkLeap
+					cmp r5, #EdgeR						;check if on right edge
+					bne .+12
+						cmp r2, #SkipF					;check if move is exactly diagonally left upwards
+						bne illegal
+							br finish
+						
+					cmp r5, #EdgeL						;check if on the left edge
+					bne .+12
+						cmp r2, #SkipC					;check if move is exactly diagonally right upwards
+						bne illegal
+							br finish
+					cmp r2, #SkipC
+					beq finish
+						cmp r2, #SkipF
+						beq finish
+							br illegal
+					
+	ilegal:		br illegal
+
+					
+	WChkLeap:	cmp r5, #NEdgeL
+				bgt .+12
+					cmp r2, #LeapC
+					bne illegal
+						br finishL
+				
+				cmp r5, #NEdgeR
+				blt	.+12
+					cmp r2, #LeapF
+					bne illegal
+						br finishL
+				
+				cmp r2, #LeapC
+				beq finishL
+					cmp r2, #LeapF
+					beq finishL
+						br illegal
+						
+	BChkLegal:	tst r2
+				bpl illegal
+				
+				neg r2
+				cmp r2, #SkipF
+				bgt BChkLeap
+					cmp r5, #EdgeR						;check if on right edge
+					bne .+12
+						cmp r2, #SkipC					;check if move is exactly diagonally left downward
+						bne illegal
+							br finish
+						
+					cmp r5, #EdgeL						;check if on the left edge
+					bne .+12
+						cmp r2, #SkipF					;check if move is exactly diagonally right downward
+						bne illegal
+							br finish
+					cmp r2, #SkipC
+					beq finish
+						cmp r2, #SkipF
+						beq finish
+							br illegal
+						
+
+
+	finishL:	mov DstPos, r5
+				add SrcPos, r5
+				asr r5
+				add #Board, r5
+				mov #Empty, (r5)
+				br finish
+				
+	illegal:		
+				mov Player, r2
+				neg r2
+				add #3, r2
+				mov r2, Player
+				mov #0, 10(sp)							; | r5 | r4 | r2 | pc | 0 |
+				mov (sp)+, r5							; | r4 | r2 | pc | 0 |	
+				mov (sp)+, r4							; | r2 | pc | 0 |	
+				mov (sp)+, r2							; | pc | 0 |
+
+				rts pc
+				
+						
+						
+	finish:		mov #Board, -(sp)						; | #Board | r5 | r4 | r2 | pc | time |
+				mov SrcPos, .+20
+				mov DstPos, .+14
+				jsr r5, movPiece
+				.blkw 2
+				mov #STstopB2, (sp)					; | String | r5 | r4 | r2 | pc | time |
+				cmp Player, #Black
+				beq .+6
+					mov #STstopW2, (sp)
+				jsr pc, print
+				mov #STmove1, (sp)
+				jsr pc, print
+				mov 12(sp), r1
+				jsr pc, printTime
+				mov #STmove2, (sp)
+				jsr pc, print
+				mov #Enter1, (sp)
+				jsr pc, printChr
+				mov #Enter2, (sp)
+				jsr pc, printChr
+				mov Player, r2
+				neg r2
+				add #3, r2
+				mov r2, Player
+				tst (sp)+								; | r5 | r4 | r2 | pc | time |
+				mov #1, 10(sp)							; | r5 | r4 | r2 | pc | 1 |
+				mov (sp)+, r5							; | r4 | r2 | pc | 1 |	
+				mov (sp)+, r4							; | r2 | pc | 1 |	
+				mov (sp)+, r2							; | pc | 1 |
+
+				rts pc
+
+							
+	BChkLeap:	cmp r5, #NEdgeL
+				bgt .+12
+					cmp r2, #LeapF
+					bne illegal
+						br finishL
+				
+				cmp r5, #NEdgeR
+				blt	.+12
+					cmp r2, #LeapC
+					bne illegal
+						br finishL
+				
+				cmp r2, #LeapC
+				beq finishL
+					cmp r2, #LeapF
+					beq finishL
+						br illegal
+						
+						
+						
+						
+printTime:		mov r0, -(sp)							; | r0 | pc |
+				mov r2, -(sp)							; | r2 | r0 | pc |
+				mov #1, r2								; used to count digits of time passed, set to 1 to prevent endless sob loop
+				clr r0
+				div rate, r0
+				mov r1, -(sp)							; | reminder of rate | r2 | r0 | pc |
+				
+				cmp r0, #10.							;see if time is less than 10 seconds, otherwise seperate it to it's different 10's components
+				blo .+24
+					inc r2								;counts the digits so unpacking them from stack would be easier
+					mov r0, r1
+					clr r0
+					div #10., r0
+					add #Ascii0, r1
+					mov r1, -(sp)						; | | | | | | | <- Digits of time in ascii | remainder | r2 | r0 | pc |
+					br .-26								;continue with breaking the number to its digits
+					
+				add #Ascii0, r0
+				mov r0, -(sp)							; | first digit of time | | | | | remainder | r2 | r0 | pc |
+
+														; < -
+				jsr	pc, printChr						; - >
+				tst (sp)+
+				sob r2, .-6								; < -
+				
+				mov #Dot, -(sp)							; | "." | remainder | r2 | r0 | pc |
+				jsr pc, printChr
+				tst (sp)+								; | remainder | r2 | r0 | pc |
+				mov (sp), r1
+				mul #10., r1
+				clr r0
+				div rate, r0
+				add #Ascii0, r0
+				mov r0, (sp)							; | the tenth of time | r2 | r0 | pc |
+				jsr pc, printChr
+				tst (sp)+								; | r2 | r0 | pc |
+				mov (sp)+, r2							; | r0 | pc |
+				mov (sp)+, r0							; | pc |
+				rts pc
+				
+						
+clock:			inc clockCounter
+				cmp currPTime, clockCounter
+				ble .+4
+					rti
+				mov #1, timeUp
+				rti
+				
+				
+prBoard:		;prints the board.
+				;r0 iterates over the board
+				;r1 is the counts the tiles per row
+				;r2 counts the rows
+				mov r0, -(sp)
+				mov r1, -(sp)
+				mov r2, -(sp)
+				mov #boardLO, -(sp)
+				jsr pc, print
+				mov #Board, r0
+				mov #10, r1
+				mov #10, r2
+			prbLoop:
+				cmp (r0), #0
+				bne prbNext1
+					mov #137, (sp)						;'_'
+					jsr pc, printChr
+					br prbNext3
+			prbNext1:
+				cmp (r0), #1							
+				bne prbNext2
+					mov #127, (sp)						;'W'
+					jsr pc, printChr
+					br prbNext3
+			prbNext2:
+				cmp (r0), #2
+				bne prbNext3
+					mov #102, (sp)						;'B'
+					jsr pc, printChr
+					;br prbNext3
+			prbNext3:
+				tst (r0)+
+				sob r1, prbLoop
+				mov #15, (sp)							;'\r'
+				jsr pc, printChr
+				mov #12, (sp)							;'\n'
+				jsr pc, printChr
+				mov #10, r1
+				sob r2, prbLoop
+				
+				jsr pc, printChr
+				mov #curP_msg, (sp)
+				jsr pc, print
+				cmp Player, #1
+				bne prbNextB
+			;prbNextW:
+				mov #STstopW2, (sp)
+				jsr pc, print
+				mov #40, (sp)
+				jsr pc, printChr
+				mov #Computer, (sp)
+				cmp roleW, #1
+				bne .+6
+				mov #Human, (sp)
+				jsr pc, print
+				br prbNext5
+				
+			prbNextB:
+				mov #STstopB2, (sp)
+				jsr pc, print
+				mov #40, (sp)
+				jsr pc, printChr
+				mov #Computer, (sp)
+				cmp roleB, #1
+				bne .+6
+				mov #Human, (sp)
+				jsr pc, print
+				;br prbNext5
+				
+				
+			prbNext5:
+				mov #15, (sp)
+				jsr pc, printChr
+				mov #12, (sp)
+				jsr pc, printChr
+				tst (sp)+
+				mov (sp)+, r2
+				mov (sp)+, r1
+				mov (sp)+, r0
+				rts pc
+					
+				
+	
 
 ;~~~~~from here on it's ATAM3:~~~~~
 
@@ -1832,27 +2352,99 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			rts pc
 			
 
-.=torg+21000
+.=torg+20000
 
 Board:
-.word 0,1,0,0,0,0,0,0
+.word 0,2,0,2,0,2,0,2
+.word 2,0,2,0,2,0,2,0
+.word 0,2,0,2,0,2,0,2
 .word 0,0,0,0,0,0,0,0
-.word 0,2,0,0,0,0,0,0
-.word 0,0,1,0,0,0,0,0
-.word 0,2,0,0,0,0,0,0
-.word 2,0,2,0,0,0,0,0
-.word 0,1,0,0,0,0,0,0
 .word 0,0,0,0,0,0,0,0
-Player:.word 2
-Steps:.word 3
+.word 1,0,1,0,1,0,1,0
+.word 0,1,0,1,0,1,0,1
+.word 1,0,1,0,1,0,1,0
+Player:.blkw 1
+Steps:.blkw 1
 
 ;output
-;21
 SrcPos: .blkw 1
-;43
 DstPos: .blkw 1
-;3
 WinParam: .blkw 1									
-										
 
-								
+input: .blkw 31
+	   .byte 0  		;up to 50(decimal) chars	
+.even
+roleW: .blkw 1
+timeW: .blkw 1
+roleB: .blkw 1
+timeB: .blkw 1
+gameStat: .blkw 1	
+enter?: .blkw 1	
+moved?: .blkw 1								
+
+rate:			.word 1000
+clockCounter:	.word 0
+currPTime:		.word 5000
+timeUp:			.word 0
+
+STtime1:		.ascii <Time left: \0>
+.even
+STtime2:		.ascii < seconds\0>
+.even
+STtime3:		.ascii <0.0\0>
+.even
+STstop1:		.ascii <WP for \0>
+.even
+STstop2:		.ascii < player is \0>
+.even
+STstop3:		.ascii < player wins!\0>
+.even
+STstopW1:		.ascii <white\0>
+.even
+STstopW2:		.ascii <White\0>
+.even
+STstopB1:		.ascii <black\0>
+.even
+STstopB2:		.ascii <Black\0>
+.even
+STtie:			.ascii <It's a tie!\0>
+.even
+STmove1:		.ascii < Human move took \0>
+.even
+STmove2:		.ascii < seconds\0>
+.even								
+
+openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!\r\n\0>
+.even 
+newRow: .ascii<\r\n$ \0>
+.even
+startMsg: .ascii<Starting a new game\r\n\r\n\0>
+.even
+startM_W: .ascii<White player is \0>
+.even
+startM_B: .ascii<Black player is \0>
+.even
+Human: .ascii<Human\0>
+.even
+Computer: .ascii<Computer\0>
+.even
+with: .ascii< with \0>
+.even
+secondsW: .blkw 8
+		  .byte 0
+.even
+secondsB: .blkw 8
+		  .byte 0
+.even
+startM2: .ascii< seconds per move\r\n\r\n\0>
+.even			
+cntExe1: .ascii<Cannot execute "\0>
+.even
+cntExe2: .ascii<".\r\n\0>
+.even
+boardLO: .ascii<Board layout: \r\n\r\n\0>
+.even
+curP_msg: .ascii<Current player: \0>
+
+. = torg + 30000
+.word 0
