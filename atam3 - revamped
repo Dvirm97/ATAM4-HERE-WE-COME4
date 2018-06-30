@@ -11,6 +11,15 @@ Tie = 0
 Lowest = 177757; which is actually -21
 Highest = 21
 
+
+
+TKS = 177560
+
+.=torg + 60
+.word input
+.word 200
+
+
 . = torg + 3000
 main:
 			mov pc, sp	;init stack
@@ -79,7 +88,7 @@ gwpaPrep:								;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcInde
 				rts pc
 				
 		packRec1:
-			mov #1, moveInvalid
+			mov #1, stepInvalid
 			mov #Player, -(sp)			;STACK: ..., #Board, #Player, Steps, tempWP, curPlayer, #Player
 			jsr pc, minOrMax
 			add #14, sp					;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
@@ -175,7 +184,7 @@ gwpBlack: 								;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3
 				jmp gwpLoopB
 			
 		packRec7:	
-			mov #1, moveInvalid
+			mov #1, stepInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -284,7 +293,7 @@ gwpWhite:
 				jmp gwpLoopW
 
 		packRec6:	
-			mov #1, moveInvalid
+			mov #1, stepInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -294,6 +303,7 @@ gwpWhite:
 			
 getMaxWP:	;Returns the best move to do and its WP
 										;| STACK: SrcPos, DstPos, WinParam, pc
+			mov #0, stepInvalid
 			;check if Player Won:			
 			mov r1, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 |
 			mov 4(sp), r1				;r1 now holds WinParam address
@@ -734,7 +744,7 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaBbr1
 
 		packRec4:
-			mov #1, moveInvalid
+			mov #1, stepInvalid
 			rts pc
 				
 gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -, pc2
@@ -817,7 +827,7 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaWbr1		
 		
 		packRec3:
-			mov #1, moveInvalid
+			mov #1, stepInvalid
 			rts pc
 
 calcWP:	
@@ -1145,7 +1155,7 @@ isOnLeft:	;checks whether a certain index is on the first column of the board - 
 			sxt r0
 			div #20, r0
 			cmp r1, #EdgeL
-			bne .+6
+			bne .+10
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
 
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
@@ -1165,7 +1175,7 @@ isOnRght:	;checks whether a certain index is on the last column of the board - r
 			sxt r0
 			div #20, r0
 			cmp r1, #EdgeR
-			bne .+6
+			bne .+10
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
 		
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
@@ -1183,7 +1193,7 @@ isOnTop:	;checks whether a certain index is on the first row of the board - retu
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
 			cmp r0, #20
-			bge .+6
+			bge .+10
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
 
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
@@ -1199,7 +1209,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
 			cmp r0, #156
-			ble .+6
+			ble .+10
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
 
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
@@ -1608,7 +1618,7 @@ stupdMov:
 			
 
 input:
-		add #1, timeUp
+		mov #1, timeUp
 		rti
     
     .=torg+30000
@@ -1628,4 +1638,13 @@ Steps:.word 5
 SrcPos: .blkw 1
 DstPos: .blkw 1
 WinParam: .blkw 1
-moveInvalid:	.word 0
+stepInvalid:	.word 0
+
+
+
+
+
+
+
+
+timeUp:		.word 0
