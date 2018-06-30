@@ -94,7 +94,7 @@ gwpaPrep:								;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcInde
 			add #14, sp					;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 			mov #Highest, 30(sp)		;STACK:  H, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 			tst r4
-			bmi .+6				;if looking for minimum return highest score and vice versa, so worst output will be returned for 
+			bmi .+10				;if looking for minimum return highest score and vice versa, so worst output will be returned for 
 										;recursion run
 				mov #Lowest, 30(sp)			;STACK:  L, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 		packRec2:
@@ -669,7 +669,7 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaBbr1:		
 			add #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #160
-			blt .+2					;if reached end of board, stops
+			blt .+4					;if reached end of board, stops
 				rts pc
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
@@ -752,7 +752,7 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 		gwpaWbr1:		
 			sub #2, 6(sp)				;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index , - , -, pc2
 			cmp 6(sp), #20
-			bge .+2					;if reached end of board, stops
+			bge .+4					;if reached end of board, stops
 				rts pc
 			mov 6(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , index, pc2
 			add 20(sp), 2(sp)			;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, index, - , #Board+index, pc2
@@ -1635,9 +1635,19 @@ Player:.word 2
 Steps:.word 5
 
 ;output
+;25
 SrcPos: .blkw 1
+;47
 DstPos: .blkw 1
+;20
 WinParam: .blkw 1
+
+
+
+
+
+
+
 stepInvalid:	.word 0
 
 
