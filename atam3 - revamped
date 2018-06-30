@@ -79,12 +79,13 @@ gwpaPrep:								;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcInde
 				rts pc
 				
 		packRec1:
+			mov #1, moveInvalid
 			mov #Player, -(sp)			;STACK: ..., #Board, #Player, Steps, tempWP, curPlayer, #Player
 			jsr pc, minOrMax
 			add #14, sp					;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 			mov #Highest, 30(sp)		;STACK:  H, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 			tst r4
-			bmi packRec2				;if looking for minimum return highest score and vice versa, so worst output will be returned for 
+			bmi .+6				;if looking for minimum return highest score and vice versa, so worst output will be returned for 
 										;recursion run
 				mov #Lowest, 30(sp)			;STACK:  L, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
 		packRec2:
@@ -174,6 +175,7 @@ gwpBlack: 								;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3
 				jmp gwpLoopB
 			
 		packRec7:	
+			mov #1, moveInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -282,6 +284,7 @@ gwpWhite:
 				jmp gwpLoopW
 
 		packRec6:	
+			mov #1, moveInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -731,6 +734,7 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaBbr1
 
 		packRec4:
+			mov #1, moveInvalid
 			rts pc
 				
 gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -, pc2
@@ -813,6 +817,7 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaWbr1		
 		
 		packRec3:
+			mov #1, moveInvalid
 			rts pc
 
 calcWP:	
@@ -1140,9 +1145,9 @@ isOnLeft:	;checks whether a certain index is on the first column of the board - 
 			sxt r0
 			div #20, r0
 			cmp r1, #EdgeL
-			bne iolNext
+			bne .+6
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
-		iolNext:
+
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
 			rts pc
@@ -1160,9 +1165,9 @@ isOnRght:	;checks whether a certain index is on the last column of the board - r
 			sxt r0
 			div #20, r0
 			cmp r1, #EdgeR
-			bne iorNext
+			bne .+6
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
-		iorNext:
+		
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
 			rts pc
@@ -1178,9 +1183,9 @@ isOnTop:	;checks whether a certain index is on the first row of the board - retu
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
 			cmp r0, #20
-			bge iotNext
+			bge .+6
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
-		iotNext:
+
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
 			rts pc
 			
@@ -1194,9 +1199,9 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
 			cmp r0, #156
-			ble iobNext
+			ble .+6
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
-		iobNext:
+
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
 			rts pc
 			
@@ -1495,7 +1500,8 @@ stupdMov:
 				br .+22
 		;unfold routine and Empty the stack
 				
-	packRec5:	sub #Board, r3
+	packRec5:		
+				sub #Board, r3
 				sub #Board, r0
 				mov r0, SrcPos
 				mov r3, DstPos
@@ -1622,3 +1628,4 @@ Steps:.word 5
 SrcPos: .blkw 1
 DstPos: .blkw 1
 WinParam: .blkw 1
+moveInvalid:	.word 0
