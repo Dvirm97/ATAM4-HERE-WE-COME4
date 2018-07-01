@@ -128,16 +128,19 @@ main:
 			cmp timeUp, #1
 			bne waitC
 			mov #Board, -(sp)
-			jsr pc, movPiece
+			jsr r5, movPiece
 		finalSP: .word 0 
 		finalDP: .word 0
 			br .+4
 		finalWP: .word 0
+		mov finalSP, -(sp)
+		mov finalDP, -(sp)
+		jsr pc, leap
+			jsr pc, printCTime
 			tst (sp)+
 			neg Player
 			add #3, Player
 			br newTurn
-			;PRINT HOW MUCH TIME THE MOVE HAS TAKEN
 
 
 		
@@ -221,7 +224,25 @@ main:
 			
 			
 
-
+leap:		;checks if leap has occured and deletes center piece accordingly
+			; STACK: | SrcPos | DstPos | PC |
+			
+			mov r1, -(sp)			; | r1 | PC | DstPos | SrcPos |
+			mov 6(sp), r1			; mov srcPos to r1 and sub dstpos from it to find difference between those
+			sub 4(sp), r1
+			tst r1
+			bpl .+4					;absolute value of difference
+				neg r1
+			cmp r1, #22
+			ble return3
+				mov 6(sp), r1
+				add 4(sp), r1
+				asr r1
+				mov #0, Board(r1)
+	return3:
+			mov (sp)+, r1
+			rts pc
+			
 
 receive: 	;receives input~
 			;assumes r0 points to current pos in input, and r1 to input's end
@@ -296,6 +317,38 @@ printChr:;Receives in stack (top to bottom):
 			movb 2(sp), @#177566
 			rts pc
 
+printCTime:			;prints line:	[player] computer move took [T] seconds.	
+					;used after computer makes move
+					;input: time to make move in clockCounter label
+					;		player in common area
+					
+			cmp Player, #1				;if player is 1 print word White, otherwise print Black
+			beq .+10
+				mov #STstopB2, -(sp)	; | pc | <text> |
+				br .+6
+			mov #STstopW2, -(sp)		; | pc | <text> |
+			jsr pc, print				;prints [player]
+			mov #comMove, (sp)			; | pc | <text> |
+			jsr pc, print				; prints (computer move took )
+			mov r1, (sp)				; | pc | r1 |
+			mov clockCounter, r1		;prepare for printTime function
+			jsr pc, printTime			; prints [T]
+			mov (sp), r1
+			mov #STmove2, (sp)			; | pc | <text> |
+			jsr pc, print				; prints (seconds)
+			mov #56, (sp)				; | pc | #56 |
+			jsr pc, printChr			; prints (.) (dot)
+			mov #15, (sp)				; | pc | enter (part 1) |
+			jsr pc, printChr
+			mov #12, (sp)				; | pc | enter (part 2) |
+			jsr pc, printChr
+			tst (sp)+
+			rts pc
+			
+			
+			
+			
+			
 clrInput:	;sets
 			mov r0, -(sp)
 			mov #input, r0
@@ -742,6 +795,30 @@ exeTime:		mov r1, -(sp)							; | r1 | pc |
 				br string2
 				
 				
+movPiece:
+										;| STACK: #Board, reg link (r5)
+										;input:	SourcePosition - inline (r5++)
+										;		DestinPosition - inline (r5+2)
+										
+			mov r0, -(sp)				;| #Board | reg link | r0 |
+			mov 4(sp), r0				;asign Board address to r0 
+			mov r1, -(sp)				;| #Board | reg link | r0 | r1 |
+			mov (r5)+, r1				;assign SrcPos to r1
+			mov r2, -(sp)				;| #Board | reg link | r0 | r1 | r2 |
+			mov r3, -(sp)				;| #Board | reg link | r0 | r1 | r2 | r3 |
+			mov (r5)+, r2				;assign DstPos to r2
+			add r0, r1					;add boardPos to SrcPos in order to get the actual adress
+			add r0, r2					;add boardPos to DstPos in order to get the actual adress 
+			
+			mov (r1), r3				;save player in SrcPos
+			mov #0, (r1)				;assign 0 to SrcPos
+			mov r3, (r2)				;assign player in SrcPos to DstPos
+			mov (sp)+, r3				;| #Board | reg link | r0 | r1 | r2 |
+			mov (sp)+, r2				;| #Board | reg link | r0 | r1 |
+			mov (sp)+, r1				;| #Board | reg link | r0 |
+			mov (sp)+, r0				;| #Board | reg link |
+			
+			rts r5			
 				
 			
 moveChk: 
@@ -1113,7 +1190,7 @@ printTime:		mov r0, -(sp)							; | r0 | pc |
 						
 clock:			inc clockCounter
 				cmp currPTime, clockCounter
-				ble .+4
+				blo .+4
 					rti
 				mov #1, timeUp
 				mov #1, enter?
@@ -1527,30 +1604,7 @@ gwpWhite:
 
 
 
-movPiece:
-										;| STACK: #Board, reg link (r5)
-										;input:	SourcePosition - inline (r5++)
-										;		DestinPosition - inline (r5+2)
-										
-			mov r0, -(sp)				;| #Board | reg link | r0 |
-			mov 4(sp), r0				;asign Board address to r0 
-			mov r1, -(sp)				;| #Board | reg link | r0 | r1 |
-			mov (r5)+, r1				;assign SrcPos to r1
-			mov r2, -(sp)				;| #Board | reg link | r0 | r1 | r2 |
-			mov r3, -(sp)				;| #Board | reg link | r0 | r1 | r2 | r3 |
-			mov (r5)+, r2				;assign DstPos to r2
-			add r0, r1					;add boardPos to SrcPos in order to get the actual adress
-			add r0, r2					;add boardPos to DstPos in order to get the actual adress 
-			
-			mov (r1), r3				;save player in SrcPos
-			mov #0, (r1)				;assign 0 to SrcPos
-			mov r3, (r2)				;assign player in SrcPos to DstPos
-			mov (sp)+, r3				;| #Board | reg link | r0 | r1 | r2 |
-			mov (sp)+, r2				;| #Board | reg link | r0 | r1 |
-			mov (sp)+, r1				;| #Board | reg link | r0 |
-			mov (sp)+, r0				;| #Board | reg link |
-			
-			rts r5			
+
 			
 			
 			
@@ -2129,7 +2183,7 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaBbr1
 
 		packRec4:
-			mov #1, stepInvalid
+			mov #1, stepInvalid			;indicate that 
 			rts pc
 			
 			
@@ -2219,7 +2273,7 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaWbr1		
 		
 		packRec3:
-			mov #1, stepInvalid
+			mov #1, stepInvalid			;indicate that recursion run has been interrupted by timeup
 			rts pc
 
 		
@@ -2501,7 +2555,7 @@ isOnLeft:	;checks whether a certain index is on the first column of the board - 
 			sxt r0
 			div #20, r0
 			cmp r1, #0
-			bne .+10
+			bne .+10					;if playpiece isnt on the left skip next command and return 0
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
 
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
@@ -2520,8 +2574,8 @@ isOnRght:	;checks whether a certain index is on the last column of the board - r
 			mov 10(sp), r1				;							| STACK: ..., 0, index, - , pc, ^r0, ^r1
 			sxt r0
 			div #20, r0
-			cmp r1, #16
-			bne .+10
+			cmp r1, #16					;if playpiece isnt on the right skip next command and return 0
+			bne .+10		
 				mov #1, 12(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0, ^r1
 		
 			mov (sp)+, r1				;							| STACK: ..., 0/1, index, - , pc, ^r0
@@ -2538,7 +2592,7 @@ isOnTop:	;checks whether a certain index is on the first row of the board - retu
 			clr 6(sp)					;set result to 0 by default	| STACK: ..., 0, index, - , pc
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
-			cmp r0, #20
+			cmp r0, #20						;if playpiece isnt on top skip next command and return 0
 			bge .+10
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
 
@@ -2555,14 +2609,14 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			mov r0, -(sp)				;							| STACK: ..., 0, index, - , pc, ^r0
 			mov 6(sp), r0				;							| STACK: ..., 0, index, - , pc, ^r0
 			cmp r0, #156
-			ble .+10
+			ble .+10						;if r0 isnt on bottom skip next command
 				mov #1, 10(sp)				;set result to 1			| STACK: ..., 1, index, - , pc, ^r0
 
 			mov (sp)+, r0				;							| STACK: ..., 0/1, index, - , pc
 			rts pc
 			
 			
-			stupdMov:
+stupdMov:
 				;input: #srcAddress 				- in r4
 				;		#dstAddress					- in r5
 				;		Player						- in common area
@@ -2611,7 +2665,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			bgt borderrb 							;if left move tile has Black, proceed to check right border
 			beq leaplb								;if left move tile has White, proceed to check left leap
 					
-				br packRec5
+				br packRec5							;found a legal move, wrap function
 
 		;checks if player can leap (eat) the playpiece on its left
 
@@ -2633,7 +2687,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 					cmp (r3), #0				;if left leap tile is occupied - 
 					bne borderrb					; - proceed to check right border
 					
-						br packRec5
+						br packRec5				;found a legal move, wrap function
 					
 		;Black right border check:
 		
@@ -2654,7 +2708,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			
 				beq leaprb							;if right move tile has White, proceed to check right leap 
 				
-				br packRec5
+				br packRec5							;found a legal move, wrap function
 				
 		;checks if player can leap (eat) the playpiece on its right
 			
@@ -2674,7 +2728,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 					cmp (r3), #0				;if right leap tile is occupied - 
 					bne nextb						; - proceed to nextB tile
 					
-					br packRec5
+					br packRec5					;found a legal move, wrap function
 					
 		;checks next tile for moves.
 						
@@ -2719,7 +2773,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			beq borderrw
 				cmp (r3), #2			;if space has a Black playpiece try and initiate eat
 				beq leaplw					
-					br packRec5
+					br packRec5			;found a legal move, wrap function
 	
 		;checks if player can leap (eat) the playpiece on its left
 	
@@ -2739,7 +2793,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 				
 					cmp (r3), #0		;if space is Empty count as eat
 					bne borderrw
-						br packRec5
+						br packRec5		;found a legal move, wrap function
 			
 		;checks if playpiece is on the right border (check if can jump to the right)
 		
@@ -2761,7 +2815,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			beq nextw
 				cmp (r3), #2			;if space has a Black playpiece try and initiate eat
 				beq leaprw
-					br packRec5
+					br packRec5			;found a legal move, wrap function
 		
 		;checks if player can leap (eat) the playpiece on its left
 	
@@ -2781,7 +2835,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			
 				cmp (r3), #0			;if space is Empty count as eat
 				bne nextw
-					br packRec5
+					br packRec5			;found a legal move, wrap function
 
 		;check next tile index
 			
@@ -2789,12 +2843,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			add #2, r0						;check nextW tile
 			cmp r0, BoardE					;if index is 176 board has been scanned top to bottom -> halt
 			ble loopw
-				br packRec5
-			
-
-			
-
-
+				br packRec5					;exit function
 
 
 
@@ -2802,7 +2851,7 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 
 .=torg+20000
 
-Board:
+Board:						;game's board for the duration of the game
 .word 0,2,0,2,0,2,0,2
 .word 2,0,2,0,2,0,2,0
 .word 0,2,0,2,0,2,0,2
@@ -2812,7 +2861,7 @@ Board:
 .word 0,1,0,1,0,1,0,1
 .word 1,0,1,0,1,0,1,0
 
-BoardSt:
+BoardSt:					;clean start board for restarting game
 .word 0,2,0,2,0,2,0,2
 .word 2,0,2,0,2,0,2,0
 .word 0,2,0,2,0,2,0,2
@@ -2822,30 +2871,33 @@ BoardSt:
 .word 0,1,0,1,0,1,0,1
 .word 1,0,1,0,1,0,1,0
 
-Player:.blkw 1
-Steps:.blkw 1
+Player:.blkw 1				;current player's turn
+Steps:.blkw 1				;depth of recursion check of minimax algorithm
 
 ;output
-SrcPos: .blkw 1
-DstPos: .blkw 1
-WinParam: .blkw 1									
+SrcPos: .blkw 1				;holds index for tile from which piece is gonna be moved (only used for pc moves)
+DstPos: .blkw 1				;holds index of destination tile of playpiece moved (only used for pc moves)
+WinParam: .blkw 1			;holds WP for current calculated move for CPU
 
-input: .blkw 31
+input: .blkw 31				;array that holds the characters of the command input by user
 	   .byte 0  		;up to 50(decimal) chars	
 .even
-roleW: .blkw 1
-timeW: .blkw 1
-roleB: .blkw 1
-timeB: .blkw 1
-gameStat: .blkw 1	
-enter?: .blkw 1	
-moved?: .blkw 1								
+roleW: .blkw 1				;is 1 if white is played by human ; 1 for CPU
+timeW: .blkw 1				;holds time set for white player's turn
+roleB: .blkw 1				;is 1 if black is played by human ; 0 for CPU
+timeB: .blkw 1				;holds time set for Black player's turn
+gameStat: .blkw 1			;flag that is up when game is in progress
+enter?: .blkw 1				;flag that indicates a command has been entered
+moved?: .blkw 1				;flag that indicates wether exeMove has initiated any moves
 
-rate:			.word 1000
-clockCounter:	.word 0
-currPTime:		.word 5000
-timeUp:			.word 0
-stepInvalid:	.word 0
+.even
+clockCounter:	.word 0		;number of clock interrupt since turn has started
+currPTime:		.word 5000	;time for current turn
+timeUp:			.word 0		;flag that indicates time for turn is up
+stepInvalid:	.word 0		;flag that is 1 if recursion run has stopped in the middle though to time being up
+
+
+;strings for printing
 
 STtime1:		.ascii <Time left: \0>
 .even
@@ -2890,10 +2942,10 @@ Computer: .ascii<Computer\0>
 .even
 with: .ascii< with \0>
 .even
-secondsW: .blkw 8
+secondsW: .blkw 8					;label used to hold and calculate time in seconds for move for white player
 		  .byte 0
 .even
-secondsB: .blkw 8
+secondsB: .blkw 8					;label used to hold and calculate time in seconds for move for Black player
 		  .byte 0
 .even
 startM2: .ascii< seconds per move\r\n\r\n\0>
@@ -2907,6 +2959,9 @@ boardLO: .ascii<Board layout: \r\n\r\n\0>
 curP_msg: .ascii<Current player: \0>
 .even
 endMsg: .ascii< is out of time. Game over.\r\n\0>
+.even
+comMove:.ascii< Computer move took \0>
 
 . = torg + 30000
 .word 0
+rate:			.word 1000
