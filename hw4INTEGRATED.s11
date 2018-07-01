@@ -81,7 +81,7 @@ main:
 		chkB:
 			mov timeB, currPTime
 			cmp roleB, #1
-			bne waitC
+			bne comTurn
 			beq waitH
 			
 		comTurn:
@@ -89,20 +89,16 @@ main:
 			mov #SrcPos, -(sp)		;just for C
 			mov #DstPos, -(sp)		;just for C
 			mov #WinParam, -(sp)	;just for C
-		waitC:
-			;how to deal with input???
-			mov SrcPos, finalSP
-			mov DstPos, finalDP
-			mov WinParam, finalWP
 			mov #newRow, -(sp)
 			jsr pc, print
 			tst (sp)+
+		waitC:
+			mov SrcPos, finalSP
+			mov DstPos, finalDP
+			mov WinParam, finalWP
 			mov #101, @#177560
-			
 			add #2, Steps
 			jsr pc, getMaxWP
-			mov #100, @#177560
-			
 			tst -(sp)
 			mov #Board, -(sp)
 			mov #1, -(sp)
@@ -1759,19 +1755,11 @@ getMaxWP:	;Returns the best move to do and its WP
 				mov Player, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r1, r4, r5, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, -21, Player
 				cmp timeUp, #1
 				bne goodTime
-					jsr pc, stupdMov
 					add #14, sp					;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 | r0 | r2 | r3 |
-					cmp SrcPos, DstPos
-					bne .+6				;->
+					mov #Board, r0
+					add #200, r0
 					jmp loopFindPlayer
-										;<-
-						mov (sp)+, r3				;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 | r0 | r2 |
-						mov (sp)+, r2				;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 | r0 |
-						mov (sp)+, r0				;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 |
-						mov (sp)+, r5				;| SrcPos | DstPos | WinParam | pc | r1 | r4 |
-						mov (sp)+, r4				;| SrcPos | DstPos | WinParam | pc | r1 |
-						mov (sp)+, r1				;| SrcPos | DstPos | WinParam | pc |
-						rts pc
+
 
 
 
@@ -2616,234 +2604,6 @@ isOnBtm:	;checks whether a certain index is on the last row of the board - retur
 			rts pc
 			
 			
-stupdMov:
-				;input: #srcAddress 				- in r4
-				;		#dstAddress					- in r5
-				;		Player						- in common area
-				;		board address				- in common area
-				;output: fills in srcAddress and dstAddress for any possible move
-			mov r0, -(sp)							;preserving r0, now used as an index for game tiles
-			mov #Board, r0
-			mov r0, BoardB
-			mov r0, BoardE
-			mov r0, BordLRo
-			add #176, BoardE
-			add #160, BordLRo
-			mov r1, -(sp)							;preserving r1, now used to count the possible moves
-			clr r1
-			mov r2, -(sp)							;preserving r2, now used for calculations
-			mov r3, -(sp)							;preserving r3, now used for calculations
-			mov r4, -(sp)							;preserving r4, now used to hold player's turn
-			mov Player , r4
-			
-			add #156, r0							;starts to go through indexes from the end to beginning
-			cmp #2, r4			
-			beq loopb
-			
-				sub #136, r0						;starts at the second last row, because there is no use checking for the last row
-				br loopw1							;checks whose turn it is
-			
-		;a loop for counting possible moves in case player is Black
-			
-	loopb:
-			cmp (r0), #2
-			bne nextb								;if not Black, proceed to nextB tile
-			
-	;Black left border check:			
-
-				mov r0, r3							;for r2r3 we check if r3(mod 20) == 0, which means we're at the left border
-				sxt r2					
-				div #20, r2
-				cmp r3, #0						;if on left border - 
-				beq tilerb							; - proceed to check right move tile (skip the right border check)			
-			
-	;B left occupation check:
-		
-			mov r0, r3
-			add #16, r3
-			cmp (r3), #1
-			bgt borderrb 							;if left move tile has Black, proceed to check right border
-			beq leaplb								;if left move tile has White, proceed to check left leap
-					
-				br packRec5							;found a legal move, wrap function
-
-		;checks if player can leap (eat) the playpiece on its left
-
-	loopw1: br loopw
-			
-	leaplb:	
-			cmp r3, BordLRo							;if White is at last row -
-			bge borderrb							; - proceed to check right border
-			
-				tst r3
-				sxt r2	
-				div #20, r2
-				cmp r3, #0						;if White is at left border - 
-				beq borderrb						; - proceed to check right border
-				
-					mov r0, r3					
-					add #16, r3
-					add #16, r3	
-					cmp (r3), #0				;if left leap tile is occupied - 
-					bne borderrb					; - proceed to check right border
-					
-						br packRec5				;found a legal move, wrap function
-					
-		;Black right border check:
-		
-	borderrb:	
-			mov r0, r3
-			sxt r2
-			div #20, r2
-			cmp r3, #16							;if on right border - 
-			beq nextb								;proceed to nextB tile
-			
-		;the label signifies a situation where we want to check if Black player can proceed to the right diagonal, when we know he is not on the right border
-			
-	tilerb:
-			mov r0, r3
-			add #22, r3
-			cmp (r3), #1			
-			bgt nextb								;if right move tile has Black, proceed to nextB tile
-			
-				beq leaprb							;if right move tile has White, proceed to check right leap 
-				
-				br packRec5							;found a legal move, wrap function
-				
-		;checks if player can leap (eat) the playpiece on its right
-			
-	leaprb:	
-			cmp r3, BordLRo							;if White is at last row - 			
-			bge nextb								; - proceed to nextB tile
-			
-				tst r3
-				sxt r2
-				div #20, r2
-				cmp r3, #16						;if White is at right border - 
-				beq nextb							;proceed to nextB tile
-				
-					mov r0, r3
-					add #22, r3					
-					add #22, r3					
-					cmp (r3), #0				;if right leap tile is occupied - 
-					bne nextb						; - proceed to nextB tile
-					
-					br packRec5					;found a legal move, wrap function
-					
-		;checks next tile for moves.
-						
-	nextb:
-			sub #2, r0								;going from end to start, each tile a word (so *2* bytes)
-			cmp r0, BoardB
-			bge loopb
-				br .+22
-		;unfold routine and Empty the stack
-				
-	packRec5:		
-				sub #Board, r3
-				sub #Board, r0
-				mov r0, SrcPos
-				mov r3, DstPos
-				mov (sp)+, r4
-				mov (sp)+, r3
-				mov (sp)+, r2
-				mov (sp)+, r1
-				mov (sp)+, r0		
-				rts pc
-		
-
-		;a loop for counting possible moves in case player is White			
-			
-	loopw:		
-			cmp (r0), r4					;checks wether current tile has a White playpiece
-			bne nextw						;if not checks next tile
-			
-				mov r0, r3						;
-				sxt r2							;
-				div #20, r2						;finds the reminders of the index, each even reminder between 0 - 20 (excluding) indicates a different horizontal location
-			
-				cmp r3, #0
-				beq tilerw					;if it's right by the left ledge, move is illegal, there's no need to check if next to right ledge, since it is 
-											;obviously by the left ledge.
-			
-			mov r0, r3					
-			sub #22, r3				
-			
-			cmp (r3), #1				;if space has a White playpiece, it cannot jump there
-			beq borderrw
-				cmp (r3), #2			;if space has a Black playpiece try and initiate eat
-				beq leaplw					
-					br packRec5			;found a legal move, wrap function
-	
-		;checks if player can leap (eat) the playpiece on its left
-	
-	leaplw:
-			tst r3
-			sxt r2						
-			div #20, r2						;finds the reminders of the index, to determine if close to the left
-			
-			cmp r3, #0
-			beq borderrw					;if it's right by the left ledge, move is illegal
-
-				mov r0,r3					;otherwise, check if close to ledge has destroyed r2, we have to recreate the checked index and find now the third 
-				sub #22, r3				;diagonal tile away from checked tile
-				sub #22, r3				;
-				cmp r3, BoardB
-				blt borderrw				;if index is negative that must mean eating would get the piece out of bounds.
-				
-					cmp (r3), #0		;if space is Empty count as eat
-					bne borderrw
-						br packRec5		;found a legal move, wrap function
-			
-		;checks if playpiece is on the right border (check if can jump to the right)
-		
-	borderrw:
-			mov r0, r3						;
-			sxt r2							;
-			div #20, r2						;finds the reminders of the index, each even reminder between 0 - 20 (excluding) indicates a different horizontal location
-						
-			cmp r3, #16
-			beq nextw						;if it's right by the right ledge, move is illegal, check the next tile
-			
-		;the label signifies a situation where we want to check if Black player can proceed to the right diagonal, when we know he is not on the right border
-			
-			
-	tilerw:
-			mov r0, r3						;
-			sub #16, r3					;
-			cmp (r3), #1				;if space has a White playpiece, it cannot jump there
-			beq nextw
-				cmp (r3), #2			;if space has a Black playpiece try and initiate eat
-				beq leaprw
-					br packRec5			;found a legal move, wrap function
-		
-		;checks if player can leap (eat) the playpiece on its left
-	
-	leaprw:	
-			tst r3
-			sxt r2						
-			div #20, r2						;finds the reminders of the index, to determine if close to the right
-			
-			cmp r3, #16
-			beq nextw						;if it's right by the right ledge, move is illegal
-			
-				mov r0,r3					;otherwise, check if close to ledge has destroyed r2, we have to recreate the checked index and find now the third 
-				sub #16, r3				;diagonal tile away from checked tile
-				sub #16, r3				;
-				cmp r3, BoardB				;
-				blt nextw					;if index is negative, that must mean eating would get the piece out of bounds.
-			
-				cmp (r3), #0			;if space is Empty count as eat
-				bne nextw
-					br packRec5			;found a legal move, wrap function
-
-		;check next tile index
-			
-	nextw:	
-			add #2, r0						;check nextW tile
-			cmp r0, BoardE					;if index is 176 board has been scanned top to bottom -> halt
-			ble loopw
-				br packRec5					;exit function
 
 
 
