@@ -20,10 +20,12 @@
 ;TPS = 177564
 ;TPB = 177566
 ;Ascii0 = 60
+;Dot = 56
 ;Enter1 = 15
 ;Enter2 = 12
 ;Minus = 55
 
+;we originally used defines, but had to get rid of them because of too many labels.
 
 
 
@@ -250,8 +252,10 @@ leap:		;checks if leap has occured and deletes center piece accordingly
 			rts pc
 			
 
-receive: 	;receives input~
-			;r0 points to current pos in input
+receive: 	;receives input and echoes.
+			;uses the words inputPtr and inputEnd
+			;inputPtr points to current position in line to write to
+			;inputEnd points to the end of the line
 			mov r0, -(sp)
 			mov inputPtr, r0
 			tstb @#177560
@@ -298,8 +302,8 @@ receive: 	;receives input~
 	inputPtr: .word 0 
 	inputEnd: .word 0 
 
-print:	;Receives in stack (top to bottom):			
-										;<text> | ...
+print:	;gets a string and prints it.
+		;receives a pointer to the string in stack
 										;pc | <text> | ...
 			mov r0, -(sp)				;r0 | pc | <text> | ...
 			mov 4(sp), r0				;r0 now holds the adress to the text
@@ -318,8 +322,8 @@ print:	;Receives in stack (top to bottom):
 			rts pc
 
 
-printChr:;Receives in stack (top to bottom):			
-										; char | ...
+printChr:;gets a character and prints it.
+		 ;receives the ascii code of the char in stack
 										;pc | char | ...
 		;wait until printer is free:
 			tstb @#177564								
@@ -355,23 +359,28 @@ printCTime:			;prints line:	[player] computer move took [T] seconds.
 			
 			
 clrInput:	;clears input.
+			;any input received after this function has been used will be considered part of a new line
+			;uses the words input and inputPtr
+			
+			
 			mov r0, -(sp)
 			mov #input, r0
 			mov r1, -(sp)
 			mov #62, r1					;62 (50 decimal) is maximum input length
-			clrb (r0)+ 					;maybe put space instead?
+			clrb (r0)+ 					
 			sob r1, .-2
 			mov (sp)+, r1
 			mov (sp)+, r0
 			mov #input, inputPtr
 			rts pc
 			
-startChk:	;receives empty place in stack, to flag whether executed or not
-			;r0 used for iterating over input
-			;r1 used for calculating time
-			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether exe'd or not
+startChk:	;reads input and checks if "start" command was assumed. if so, executes it.
+			;receives empty place in stack, to flag whether executed or not
+			;uses the word input, RtempW, TtempW, RtempB, TtempB
+			;these words are used to temporarily hold the role and time of both players
+			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether exe'd or not (now 0)
 			mov r0, -(sp)				;r0 | pc | 0 | ...
-			mov #input, r0
+			mov #input, r0				;r0 used for iterating over input
 			mov r1, -(sp)				;r1 | r0 | pc | 0 | ...
 			clr r1
 			mov r2, -(sp)				;r2 | r1 | r0 | pc | 0 | ...
@@ -382,7 +391,8 @@ startChk:	;receives empty place in stack, to flag whether executed or not
 			beq .-6						;-> 
 			
 			cmpb (r0)+, #163			;'s'
-			bne .+6						; supposed to be sChkX but branch too far
+			beq .+4
+			jmp sChkX					;branch was too far.
 			cmpb (r0)+, #164			;'t'
 			bne sChkX
 			cmpb (r0)+, #141			;'a'
@@ -516,7 +526,11 @@ RtempB: .blkw 1
 TtempB: .blkw 1
 
 			
-exeStart:
+exeStart:	;initiates a game.
+			;prints the respective game-start messages
+			;sets up relevant flags (that are in common area)
+			;such as Player, Steps, gameStat
+			;restarts the board
 			mov #100, @#177546
 			mov #1, Player
 			mov #1, Steps
@@ -557,7 +571,7 @@ exeStart:
 			rts pc
 			
 trnToNum:	;gets in stack a number that represents an ascii code
-			;*overwrites it* and returns the (oct)number it represents
+			;*overwrites it* and returns the (octal) number it represents
 			;if it's not a digit at all, returns -1
 										;pc | digit
 			cmp 2(sp), #60
@@ -570,7 +584,7 @@ trnToNum:	;gets in stack a number that represents an ascii code
 			mov #-1, 2(sp)				;pc | -1
 			rts pc
 			
-;reads the input and calls the appropriate command, if game status permits
+;calls the command-reading functions, if game status permits; if no function was executed, prints "Cannot execute" etc
 readCmd:	
 			tst -(sp)						; - | pc
 			cmp gameStat, #1
@@ -602,7 +616,7 @@ readCmd:
 			mov (sp), moved?
 			cmp (sp), #1
 			beq rcmdX
-			;br rcmdErr
+				;br rcmdErr
 			
 		rcmdErr:
 			mov #cntExe1, -(sp)				;<cantExecute1> | 0 | pc | ...
@@ -619,8 +633,10 @@ readCmd:
 			tst (sp)+
 			rts pc
 			
-stopChk: 
-		mov #0, 2(sp)
+stopChk: 	;reads input and checks if "stop" command was assumed. if so, executes it.
+			;receives empty place in stack, to flag whether executed or not
+			;uses the word input
+		mov #0, 2(sp)				;flag is now 0
 		mov r0, -(sp)
 		mov #input, r0
 		
@@ -641,12 +657,14 @@ stopChk:
 		rts pc
 	
 	stpChk1:
-		mov #1, 4(sp)
+		mov #1, 4(sp)				;flag is now 1
 		jsr pc, exeStop
 		br stpChkX
 		
 		
-exeStop:		;stops shit.	
+exeStop:		;puts an end to shit.
+				;prints winner according to Board's current status
+				;sets game status to 0 
 				mov r0, -(sp)							; | r0 | pc |... 
 				mov r1, -(sp)							; | r1 | r0 | pc |...
 				mov r4, -(sp)							; | r4 | r1 | r0 | pc |...
@@ -748,7 +766,9 @@ exeStop:		;stops shit.
 				
 				
 		
-timeChk: 
+timeChk:	;reads input and check if "time" command was assumed. if so, executes it.
+			;receives empty place in stack, to flag whether executed or not
+			;uses the word input
 		mov #0, 2(sp)
 		mov r0, -(sp)
 		mov #input, r0
@@ -774,7 +794,8 @@ timeChk:
 		jsr pc, exeTime
 		br tChkX
 		
-exeTime:		mov r1, -(sp)							; | r1 | pc |
+exeTime:	;prints the current player's remaining time.
+				mov r1, -(sp)							; | r1 | pc |
 				mov #STtime1, -(sp)						; | string | r1 | pc |
 				jsr pc, print								
 				cmp #1,  timeUp
@@ -800,39 +821,17 @@ exeTime:		mov r1, -(sp)							; | r1 | pc |
 
 					
 	noTime:		mov #STtime3, (sp)
-				mov #3, -(sp)
 				jsr pc, print
 				tst (sp)+
 				br string2
 				
-				
-movPiece:
-										;| STACK: #Board, reg link (r5)
-										;input:	SourcePosition - inline (r5++)
-										;		DestinPosition - inline (r5+2)
-										
-			mov r0, -(sp)				;| #Board | reg link | r0 |
-			mov 4(sp), r0				;asign Board address to r0 
-			mov r1, -(sp)				;| #Board | reg link | r0 | r1 |
-			mov (r5)+, r1				;assign SrcPos to r1
-			mov r2, -(sp)				;| #Board | reg link | r0 | r1 | r2 |
-			mov r3, -(sp)				;| #Board | reg link | r0 | r1 | r2 | r3 |
-			mov (r5)+, r2				;assign DstPos to r2
-			add r0, r1					;add boardPos to SrcPos in order to get the actual adress
-			add r0, r2					;add boardPos to DstPos in order to get the actual adress 
-			
-			mov (r1), r3				;save player in SrcPos
-			mov #0, (r1)				;assign 0 to SrcPos
-			mov r3, (r2)				;assign player in SrcPos to DstPos
-			mov (sp)+, r3				;| #Board | reg link | r0 | r1 | r2 |
-			mov (sp)+, r2				;| #Board | reg link | r0 | r1 |
-			mov (sp)+, r1				;| #Board | reg link | r0 |
-			mov (sp)+, r0				;| #Board | reg link |
-			
-			rts r5			
+							
 				
 			
-moveChk: 
+moveChk:;reads input and checks if "move" command was assumed. if so, attempts to execute it.
+		;receives empty place in stack, to flag whether executed or not
+		;uses the word input, and the words tempSrc and tempDst
+		;
 		mov #0, 2(sp)				;pc | 0
 		mov r0, -(sp)				;r0 | pc | 0
 		mov #input, r0
@@ -936,7 +935,8 @@ tempDst: .blkw 1
 
 
 
-stBoard:	;restarts the board
+stBoard:	;restarts the board (initiates it for a new game).
+			;uses the words Board and BoardSt (common area)
 			mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp)
@@ -957,7 +957,8 @@ stBoard:	;restarts the board
 
 
 
-exeMove:		mov r2, -(sp)							; | r2 | pc | - |
+exeMove:	;if received move is legal, executes it and return 1, else returns 0
+				mov r2, -(sp)							; | r2 | pc | - |
 				mov r4, -(sp)							; | r4 | r2 | pc | - |
 				mov r5, -(sp)							; | r5 | r4 | r2 | pc | - |
 				mov clockCounter, 10(sp)				; | r5 | r4 | r2 | pc | time |
@@ -1161,7 +1162,8 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 						
 						
 						
-printTime:		mov r0, -(sp)							; | r0 | pc |
+printTime:		;prints time.
+				mov r0, -(sp)							; | r0 | pc |
 				mov r2, -(sp)							; | r2 | r0 | pc |
 				mov #1, r2								; used to count digits of time passed, set to 1 to prevent endless sob loop
 				clr r0
@@ -1211,13 +1213,11 @@ clock:			inc clockCounter
 				rti
 				
 				
-prBoard:		;prints the board.
-				;r0 iterates over the board
-				;r1 is the counts the tiles per row
-				;r2 counts the rows
-				mov r0, -(sp)
-				mov r1, -(sp)
-				mov r2, -(sp)
+prBoard:		;prints the board in its current state.
+				;uses the word input (common area)
+				mov r0, -(sp)					;r0 iterates over the board
+				mov r1, -(sp)					;r1 counts the tiles per row
+				mov r2, -(sp)					;r2 counts the rows
 				mov #boardLO, -(sp)
 				jsr pc, print
 				mov #Board, r0
@@ -1301,6 +1301,29 @@ prBoard:		;prints the board.
 
 ;~~~~~from here on it's ATAM3:~~~~~
 
+movPiece:
+										;| STACK: #Board, reg link (r5)
+										;input:	SourcePosition - inline (r5++)
+										;		DestinPosition - inline (r5+2)
+										
+			mov r0, -(sp)				;| #Board | reg link | r0 |
+			mov 4(sp), r0				;asign Board address to r0 
+			mov r1, -(sp)				;| #Board | reg link | r0 | r1 |
+			mov (r5)+, r1				;assign SrcPos to r1
+			mov r2, -(sp)				;| #Board | reg link | r0 | r1 | r2 |
+			mov r3, -(sp)				;| #Board | reg link | r0 | r1 | r2 | r3 |
+			mov (r5)+, r2				;assign DstPos to r2
+			add r0, r1					;add boardPos to SrcPos in order to get the actual adress
+			add r0, r2					;add boardPos to DstPos in order to get the actual adress 
+			
+			mov (r1), r3				;save player in SrcPos
+			mov #0, (r1)				;assign 0 to SrcPos
+			mov r3, (r2)				;assign player in SrcPos to DstPos
+			mov (sp)+, r3				;| #Board | reg link | r0 | r1 | r2 |
+			mov (sp)+, r2				;| #Board | reg link | r0 | r1 |
+			mov (sp)+, r1				;| #Board | reg link | r0 |
+			mov (sp)+, r0				;| #Board | reg link |
+			rts r5
 
 			
 ;checks if player has any playpieces on board, if not that is not a winning situation
