@@ -252,7 +252,8 @@ leap:		;checks if leap has occured and deletes center piece accordingly
 			rts pc
 			
 
-receive: 	;receives input and echoes.
+receive: 	;input interrupt
+			;receives input and echoes.
 			;uses the words inputPtr and inputEnd
 			;inputPtr points to current position in line to write to
 			;inputEnd points to the end of the line
@@ -303,7 +304,7 @@ receive: 	;receives input and echoes.
 	inputEnd: .word 0 
 
 print:	;gets a string and prints it.
-		;receives a pointer to the string in stack
+		;receives in stack a pointer to the string 
 										;pc | <text> | ...
 			mov r0, -(sp)				;r0 | pc | <text> | ...
 			mov 4(sp), r0				;r0 now holds the adress to the text
@@ -360,7 +361,7 @@ printCTime:			;prints line:	[player] computer move took [T] seconds.
 			
 clrInput:	;clears input.
 			;any input received after this function has been used will be considered part of a new line
-			;uses the words input and inputPtr
+			;uses the words input and inputPtr (common area)
 			
 			
 			mov r0, -(sp)
@@ -375,9 +376,10 @@ clrInput:	;clears input.
 			rts pc
 			
 startChk:	;reads input and checks if "start" command was assumed. if so, executes it.
-			;receives empty place in stack, to flag whether executed or not
-			;uses the word input, RtempW, TtempW, RtempB, TtempB
+			;receives empty place in stack, to flag whether executed or not (1 if did, 0 if not)
+			;uses the word input (common area), RtempW, TtempW, RtempB, TtempB
 			;these words are used to temporarily hold the role and time of both players
+			;the word input holds the last row of input
 			mov #0, 2(sp)				;pc | 0 | ...	- the flag for whether exe'd or not (now 0)
 			mov r0, -(sp)				;r0 | pc | 0 | ...
 			mov #input, r0				;r0 used for iterating over input
@@ -635,7 +637,7 @@ readCmd:
 			
 stopChk: 	;reads input and checks if "stop" command was assumed. if so, executes it.
 			;receives empty place in stack, to flag whether executed or not
-			;uses the word input
+			;uses the word input (common area), which is the last row of input
 		mov #0, 2(sp)				;flag is now 0
 		mov r0, -(sp)
 		mov #input, r0
@@ -662,9 +664,9 @@ stopChk: 	;reads input and checks if "stop" command was assumed. if so, executes
 		br stpChkX
 		
 		
-exeStop:		;puts an end to shit.
+exeStop:		;stops the game.
 				;prints winner according to Board's current status
-				;sets game status to 0 
+				;sets game status to 0
 				mov r0, -(sp)							; | r0 | pc |... 
 				mov r1, -(sp)							; | r1 | r0 | pc |...
 				mov r4, -(sp)							; | r4 | r1 | r0 | pc |...
@@ -768,7 +770,7 @@ exeStop:		;puts an end to shit.
 		
 timeChk:	;reads input and check if "time" command was assumed. if so, executes it.
 			;receives empty place in stack, to flag whether executed or not
-			;uses the word input
+			;uses the word input (common area)
 		mov #0, 2(sp)
 		mov r0, -(sp)
 		mov #input, r0
@@ -794,7 +796,9 @@ timeChk:	;reads input and check if "time" command was assumed. if so, executes i
 		jsr pc, exeTime
 		br tChkX
 		
-exeTime:	;prints the current player's remaining time.
+exeTime:	;prints a message with the current player's remaining time.
+			;uses the words currPTime and clockCounter (common area)
+			
 				mov r1, -(sp)							; | r1 | pc |
 				mov #STtime1, -(sp)						; | string | r1 | pc |
 				jsr pc, print								
@@ -1162,7 +1166,8 @@ exeMove:	;if received move is legal, executes it and return 1, else returns 0
 						
 						
 						
-printTime:		;prints time.
+printTime:		;prints time
+				;gets time doubled by rate in r1, and prints the corresponding number in seconds (decimal)
 				mov r0, -(sp)							; | r0 | pc |
 				mov r2, -(sp)							; | r2 | r0 | pc |
 				mov #1, r2								; used to count digits of time passed, set to 1 to prevent endless sob loop
@@ -1204,7 +1209,10 @@ printTime:		;prints time.
 				rts pc
 				
 						
-clock:			inc clockCounter
+clock:			;clock interrupt.
+				;increments clockCounter; 
+				;if it's higher than current player's time limit, sets up the "timeUp" and "enter?" flags.
+				inc clockCounter
 				cmp currPTime, clockCounter
 				blo .+4
 					rti
