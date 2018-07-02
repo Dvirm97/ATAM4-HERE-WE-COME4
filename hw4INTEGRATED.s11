@@ -49,17 +49,19 @@ main:
 			tst (sp)
 			
 			mov #input, r0
-			mov #input, r1
-			add #62, r1				;adress of end of input			
+			mov #input, inputPtr
+			mov #input, inputEnd
+			add #62, inputEnd		;adress of end of input			
 			tst (sp)+
 		;Before any game has begun:
 		stage1:
-			mov #0, @#177546
+			mov #0, @#177546		;stop clock
 			mov #0, gameStat
 			mov #0, enter?
 			mov #0, moved?
 			mov #newRow, (sp)
 			jsr pc, print
+		waitStrt:
 			mov #101, @#177560	
 			wait					;<-
 			cmp enter?, #1			
@@ -67,7 +69,7 @@ main:
 			mov #0, enter?
 			mov #100, @#177560	
 			cmp gameStat, #1
-			bne stage1
+			bne waitStrt
 		newTurn:
 			jsr pc, prBoard
 			mov #0, clockCounter
@@ -241,8 +243,9 @@ leap:		;checks if leap has occured and deletes center piece accordingly
 			
 
 receive: 	;receives input~
-			;assumes r0 points to current pos in input, and r1 to input's end
-			
+			;r0 points to current pos in input
+			mov r0, -(sp)
+			mov inputPtr, r0
 			tstb @#177560
 			bpl .-4
 			clr -(sp)					; 0 |
@@ -257,12 +260,14 @@ receive: 	;receives input~
 				jsr pc, printChr
 				jsr pc, printChr		;go down *2* rows
 				mov #input, r0
-				;
 				jsr pc, readCmd
 				jsr pc, clrInput
+				mov #newRow, -(sp)
+				jsr pc, print
+				tst (sp)+
 				br r_end
 				
-	r_check2:
+		r_check2:
 			cmp (sp), #10				;is BackSpace?
 			bne r_next					;->	
 				cmp r0, #input
@@ -275,13 +280,18 @@ receive: 	;receives input~
 				tstb -(r0)
 				clrb (r0)
 				br r_end
-	r_next:	cmp r0, r1
+	r_next:	cmp r0, inputEnd
 			bge r_end
 			movb @#177562, (r0)+			;<-
 			jsr pc, printChr
 	r_end:	tst (sp)+					;~empty~
+			mov r0, inputPtr
+			mov (sp)+, r0
+			
 			bis #1, @#177560
 			rti
+	inputPtr: .word 0 
+	inputEnd: .word 0 
 
 print:	;Receives in stack (top to bottom):			
 										;<text> | ...
@@ -345,7 +355,7 @@ printCTime:			;prints line:	[player] computer move took [T] seconds.
 			
 			
 			
-clrInput:	;sets
+clrInput:	;clears input.
 			mov r0, -(sp)
 			mov #input, r0
 			mov r1, -(sp)
@@ -354,6 +364,7 @@ clrInput:	;sets
 			sob r1, .-2
 			mov (sp)+, r1
 			mov (sp)+, r0
+			mov #input, inputPtr
 			rts pc
 			
 startChk:	;receives empty place in stack, to flag whether executed or not
@@ -1383,6 +1394,7 @@ gwpaPrep:								;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcInde
 				rts pc
 				
 		packRec1:
+			mov #1, stepInvalid
 			mov #Player, -(sp)			;STACK: ..., #Board, #Player, Steps, tempWP, curPlayer, #Player
 			jsr pc, minOrMax
 			add #14, sp					;STACK:  tempWP, #Board, #Player, steps, curPlayer, pc, srcIndex, - , dstIndex, pc2, pc3, ^r4, ^r5
@@ -1439,7 +1451,7 @@ gwpBlack: 								;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3
 		gwpBnxt2:
 			;YAY RECURSION MUCH FUN YAY
 			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2
-			cmp #1, timeUp				;if flag is on 1, time is up. unload recursion
+			cmp #1, timeUp
 			beq packRec7
 				jsr pc, prepMov
 			
@@ -1472,12 +1484,13 @@ gwpBlack: 								;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3
 		gwpBnxt3:
 			;YAY RECURSION MUCH FUN YAY
 			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2
-			cmp #1, timeUp				;if flag is on 1, time is up. unload recursion
+			cmp #1, timeUp
 			beq packRec7
 				jsr pc, prepMov
 				jmp gwpLoopB
 			
 		packRec7:	
+			mov #1, stepInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -1547,7 +1560,7 @@ gwpWhite:
 		gwpWnxt2:
 			;YAY RECURSION MUCH FUN YAY
 			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2
-			cmp #1, timeUp				;if flag is on 1, time is up. unload recursion
+			cmp #1, timeUp
 			beq packRec6
 				jsr pc, prepMov
 			
@@ -1580,12 +1593,13 @@ gwpWhite:
 		gwpWnxt3:
 			;YAY RECURSION MUCH FUN YAY
 			sub #Board, 2(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2
-			cmp #1, timeUp				;if flag is on 1, time is up. unload recursion
+			cmp #1, timeUp
 			beq packRec6
 				jsr pc, prepMov
 				jmp gwpLoopW
 
 		packRec6:	
+			mov #1, stepInvalid
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
 			mov 32(sp), -(sp)			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos, #DstPos
 			mov 6(sp), @(sp)+			;STACK: #srcPos, #dstPos, WinParam, pc, r1, r4, r5, r0, r2, r3, srcIndex, - , dstIndex, pc2, #srcPos
@@ -1605,6 +1619,7 @@ gwpWhite:
 			
 getMaxWP:	;Returns the best move to do and its WP
 										;| STACK: SrcPos, DstPos, WinParam, pc
+			mov #0, stepInvalid
 			;check if Player Won:			
 			mov r1, -(sp)				;| SrcPos | DstPos | WinParam | pc | r1 |
 			mov 4(sp), r1				;r1 now holds WinParam address
@@ -1749,7 +1764,7 @@ getMaxWP:	;Returns the best move to do and its WP
 				mov Steps, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r1, r4, r5, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps
 				mov #177757, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r1, r4, r5, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, -21
 				mov Player, -(sp)		;STACK: #srcPos, #dstPos, #WinParam, pc, r1, r4, r5, r0, r2, r3, *AdversaryMoves*, #Board, #Player, Steps, -21, Player
-				cmp timeUp, #1			;if flag is on 1, time is up. unload recursion
+				cmp timeUp, #1
 				bne goodTime
 					add #14, sp					;| SrcPos | DstPos | WinParam | pc | r1 | r4 | r5 | r0 | r2 | r3 |
 					mov #Board, r0
@@ -2167,6 +2182,7 @@ gwpaDoB:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaBbr1
 
 		packRec4:
+			mov #1, stepInvalid			;indicate that 
 			rts pc
 			
 			
@@ -2256,6 +2272,7 @@ gwpaDoW:								;STACK: tempWP, #Board, #Player, steps, curPlayer, pc, - , - , -
 				jmp gwpaWbr1		
 		
 		packRec3:
+			mov #1, stepInvalid			;indicate that recursion run has been interrupted by timeup
 			rts pc
 
 		
@@ -2648,6 +2665,8 @@ moved?: .blkw 1				;flag that indicates wether exeMove has initiated any moves
 clockCounter:	.word 0		;number of clock interrupt since turn has started
 currPTime:		.word 5000	;time for current turn
 timeUp:			.word 0		;flag that indicates time for turn is up
+stepInvalid:	.word 0		;flag that is 1 if recursion run has stopped in the middle though to time being up
+
 
 ;strings for printing
 
