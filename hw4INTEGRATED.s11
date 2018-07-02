@@ -20,7 +20,6 @@
 ;TPS = 177564
 ;TPB = 177566
 ;Ascii0 = 60
-;Dot = 56
 ;Enter1 = 15
 ;Enter2 = 12
 ;Minus = 55
@@ -59,19 +58,24 @@ main:
 			mov #0, gameStat
 			mov #0, enter?
 			mov #0, moved?
-			mov #newRow, (sp)
+			mov #newRow, -(sp)
 			jsr pc, print
+			tst (sp)+
 		waitStrt:
 			mov #101, @#177560	
 			wait					;<-
 			cmp enter?, #1			
-			bne .-8					;->
+			bne .-10				;->
 			mov #0, enter?
 			mov #100, @#177560	
 			cmp gameStat, #1
 			bne waitStrt
 		newTurn:
+			jsr pc, clrInput
 			jsr pc, prBoard
+			mov #newRow, -(sp)
+			jsr pc, print
+			tst (sp)+
 			mov #0, clockCounter
 			mov #0, timeUp
 			cmp Player, #1
@@ -79,21 +83,18 @@ main:
 				mov timeW, currPTime
 				cmp roleW, #1
 				bne comTurn
-				beq waitH
+				beq humTurn
 		chkB:
 			mov timeB, currPTime
 			cmp roleB, #1
 			bne comTurn
-			beq waitH
+			beq humTurn
 			
 		comTurn:
 			mov #-1, Steps			;just for C
 			mov #SrcPos, -(sp)		;just for C
 			mov #DstPos, -(sp)		;just for C
 			mov #WinParam, -(sp)	;just for C
-			mov #newRow, -(sp)
-			jsr pc, print
-			tst (sp)+
 		waitC:
 			mov SrcPos, finalSP
 			mov DstPos, finalDP
@@ -108,8 +109,9 @@ main:
 			tst (sp)+
 			tst (sp)+
 			cmp (sp)+, #1
-			bne .+6
+			bne .+12
 			jsr pc, exeStop
+			jmp stage1
 			
 			tst -(sp)
 			mov #Board, -(sp)
@@ -122,7 +124,8 @@ main:
 			jsr pc, exeStop
 			
 			cmp gameStat, #1
-			bne stage1
+			beq .+6
+			jmp stage1
 			cmp timeUp, #1
 			bne waitC
 			mov #Board, -(sp)
@@ -134,19 +137,23 @@ main:
 		mov finalSP, -(sp)
 		mov finalDP, -(sp)
 		jsr pc, leap
+			mov #15, -(sp)
+			jsr pc, printChr
+			mov #12, (sp)
+			jsr pc, printChr
+			jsr pc, printChr
+			tst (sp)+
+			mov #100, @#177560
 			jsr pc, printCTime
 			tst (sp)+
 			neg Player
 			add #3, Player
-			br newTurn
+			jmp newTurn
 
-
-		
+		humTurn:
 		waitH:
 			;| - | board address | player | reg link |
 			mov #101, @#177560
-			mov #newRow, (sp)
-			jsr pc, print
 			wait						;<-	
 			cmp enter?, #1			
 			bne .-10					;->
@@ -163,8 +170,9 @@ main:
 			tst (sp)+
 			tst (sp)+
 			cmp (sp)+, #1
-			bne .+6
+			bne .+12
 			jsr pc, exeStop
+			jmp stage1
 			
 			tst -(sp)
 			mov #Board, -(sp)
@@ -251,6 +259,7 @@ receive: 	;receives input~
 			clr -(sp)					; 0 |
 			movb @#177562, (sp)			;char |
 			
+			
 			cmp (sp), #15				;is enter?
 			bne r_check2
 				mov #1, enter?
@@ -262,9 +271,6 @@ receive: 	;receives input~
 				mov #input, r0
 				jsr pc, readCmd
 				jsr pc, clrInput
-				mov #newRow, -(sp)
-				jsr pc, print
-				tst (sp)+
 				br r_end
 				
 		r_check2:
@@ -284,11 +290,10 @@ receive: 	;receives input~
 			bge r_end
 			movb @#177562, (r0)+			;<-
 			jsr pc, printChr
-	r_end:	tst (sp)+					;~empty~
+	r_end:	bis #1, @#177560
+			tst (sp)+					;~empty~
 			mov r0, inputPtr
 			mov (sp)+, r0
-			
-			bis #1, @#177560
 			rti
 	inputPtr: .word 0 
 	inputEnd: .word 0 
@@ -342,12 +347,6 @@ printCTime:			;prints line:	[player] computer move took [T] seconds.
 			mov (sp), r1
 			mov #STmove2, (sp)			; | pc | <text> |
 			jsr pc, print				; prints (seconds)
-			mov #56, (sp)				; | pc | #56 |
-			jsr pc, printChr			; prints (.) (dot)
-			mov #15, (sp)				; | pc | enter (part 1) |
-			jsr pc, printChr
-			mov #12, (sp)				; | pc | enter (part 2) |
-			jsr pc, printChr
 			tst (sp)+
 			rts pc
 			
@@ -613,6 +612,9 @@ readCmd:
 			mov #cntExe2, (sp)				;<cantExecute2> | 0 | pc | ...
 			jsr pc, print			
 			tst (sp)+
+			mov #newRow, -(sp)
+			jsr pc, print
+			tst (sp)+
 		rcmdX:
 			tst (sp)+
 			rts pc
@@ -791,7 +793,9 @@ exeTime:		mov r1, -(sp)							; | r1 | pc |
 					jsr pc, printChr
 					tst (sp)+								; | r1 | pc |
 					mov (sp)+, r1							; | pc |
-					
+					mov #newRow, -(sp)
+					jsr pc, print
+					tst (sp)+
 					rts	pc		
 
 					
@@ -1130,6 +1134,9 @@ exeMove:		mov r2, -(sp)							; | r2 | pc | - |
 				mov (sp)+, r5							; | r4 | r2 | pc | 1 |	
 				mov (sp)+, r4							; | r2 | pc | 1 |	
 				mov (sp)+, r2							; | pc | 1 |
+				mov #newRow, -(sp)
+				jsr pc, print
+				tst (sp)+
 				rts pc
 
 							
@@ -2680,7 +2687,7 @@ STstop1:		.ascii <WP for \0>
 .even
 STstop2:		.ascii < player is \0>
 .even
-STstop3:		.ascii < player wins!\0>
+STstop3:		.ascii < player wins!\r\n\0>
 .even
 STstopW1:		.ascii <white\0>
 .even
@@ -2690,11 +2697,11 @@ STstopB1:		.ascii <black\0>
 .even
 STstopB2:		.ascii <Black\0>
 .even
-STtie:			.ascii <It's a tie!\0>
+STtie:			.ascii <It's a tie!\r\n\0>
 .even
 STmove1:		.ascii < Human move took \0>
 .even
-STmove2:		.ascii < seconds\0>
+STmove2:		.ascii < seconds.\r\n\r\n\0>
 .even								
 
 openMsg: .ascii<Welcome to 315849919 and 208543538 checkers game!\r\n\0>
